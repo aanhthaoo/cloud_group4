@@ -1,0 +1,57 @@
+ạn là một Chuyên gia Phát triển Frontend React và Chuyên gia UI/UX.
+
+Nhiệm vụ: Khởi tạo một dự án React (sử dụng Vite hoặc Create React App) cho "Hệ thống Đặt lịch Spa/Salon và Quản lý Thẻ thành viên". Giao diện cần đơn giản, trực quan và thân thiện với người dùng.
+
+Yêu cầu về Thiết kế (Design System):
+
+Màu sắc chủ đạo: >     * Màu nền chính: Trắng (#FFFFFF).
+
+Màu điểm nhấn chính (Primary Accent): Hồng pastel hoặc hồng cánh sen nhẹ (ví dụ: #FFB6C1 hoặc #FF69B4) cho các nút bấm chính (Call-to-action).
+
+Màu điểm nhấn phụ (Secondary Accent): Tím nhạt hoặc tím thanh lịch (ví dụ: #E6E6FA hoặc #8A2BE2) cho các đường viền, icon, hoặc header.
+
+Màu chữ: Xám đậm hoặc đen để đảm bảo độ tương phản.
+
+Thư viện CSS: Sử dụng Tailwind CSS để thiết lập màu sắc và bố cục nhanh chóng.
+
+Cấu trúc Components Yêu cầu (Vui lòng tạo mockup UI cho các phần sau):
+
+Layout Chính (Main Layout):
+
+Thanh điều hướng (Navbar) ở trên cùng, bao gồm Logo, các liên kết và nút "Đăng nhập".
+
+Khu vực nội dung chính ở giữa.
+
+Một Widget Chat nổi (Floating Chat Widget) ở góc dưới cùng bên phải để mô phỏng Lễ tân ảo AI.
+
+Màn hình Đặt lịch (Booking Flow):
+
+Bước 1: Chọn dịch vụ và kỹ thuật viên. Hiển thị danh sách dạng thẻ (cards) trực quan.
+
+Bước 2: Chọn thời gian. Tuyệt đối KHÔNG sử dụng các thư viện calendar bên ngoài. Hãy thiết kế giao diện chọn thời gian bằng các thẻ <input type="date"> và <input type="time"> cơ bản của HTML, hoặc sử dụng danh sách thả xuống (dropdown/select) chứa các khung giờ trống tĩnh (ví dụ: 09:00, 10:30).
+
+Lưu ý UI: Cần có một thông báo nhỏ gọn hoặc đồng hồ đếm ngược mô phỏng trạng thái "Khóa tạm thời" (Soft-hold) 15 phút sau khi người dùng nhấn đặt.
+
+Màn hình Thanh toán cọc (Deposit & Checkout):
+
+Hiển thị Hóa đơn tạm tính (Provisional Invoice) cho thấy số tiền cọc.
+
+Khu vực hiển thị Mã QR chuyển khoản tĩnh.
+
+Form tải tệp lên (File Upload) cho phép đính kèm ảnh chụp màn hình biên lai ngân hàng.
+
+Ô tick kiểm tra bảo mật (mô phỏng reCAPTCHA) trước nút "Xác nhận chốt lịch".
+
+Màn hình Quản lý Thẻ thành viên (Loyalty Dashboard):
+
+Hiển thị thông tin người dùng, số điểm tích lũy và hạng thẻ (Silver/Gold/VIP) bằng huy hiệu (badge) màu sắc tương ứng.
+
+Yêu cầu kỹ thuật:
+
+Code cần được chia nhỏ thành các thư mục component (ví dụ: /components/Booking, /components/Payment, /components/Chat).
+
+Sử dụng Functional Components và React Hooks.
+
+Tạo dữ liệu giả (mock data) cho danh sách dịch vụ và các khung giờ tĩnh để giao diện có thể render trực tiếp mà không cần Backend.
+
+Hãy viết mã và trả về cấu trúc thư mục cùng các tệp gốc (App.jsx, index.css) để tôi có thể chạy thử ngay.
