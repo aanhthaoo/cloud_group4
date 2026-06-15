@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import axios from "axios";
 
 interface User {
   name: string;
@@ -9,14 +10,16 @@ interface User {
 interface AuthContextType {
   isLoggedIn: boolean;
   user: User | null;
-  login: (email: string, name?: string) => void;
+  login: (email: string, password?: string) => Promise<void>;
+  register: (data: { email: string; password?: string; fullName: string; phoneNumber: string }) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isLoggedIn: false,
   user: null,
-  login: () => {},
+  login: async () => {},
+  register: async () => {},
   logout: () => {},
 });
 
@@ -30,23 +33,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const login = (email: string, name?: string) => {
-    const mockUser: User = {
-      name: name || "Nguyễn Thị Hoa",
-      email: email || "hoa@lotusglow.vn",
-      phone: "0912 345 678",
-    };
-    localStorage.setItem("lotus_user", JSON.stringify(mockUser));
-    setUser(mockUser);
+  const login = async (email: string, password?: string) => {
+    try {
+      const response = await axios.post("/api/auth/login", { email, password });
+      
+      const backendData = response.data?.data || {};
+      const userData = {
+        ...backendData,
+        name: backendData.fullName || backendData.name || "Người dùng hệ thống",
+        email: backendData.email || email,
+        phone: backendData.phoneNumber || backendData.phone || ""
+      };
+      
+      localStorage.setItem("lotus_user", JSON.stringify(userData));
+      setUser(userData);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại.";
+      throw new Error(errorMsg);
+    }
   };
 
-  const logout = () => {
-    localStorage.removeItem("lotus_user");
-    setUser(null);
+  const register = async (data: { email: string; password?: string; fullName: string; phoneNumber: string }) => {
+    try {
+      const response = await axios.post("/api/auth/register", data);
+      
+      const backendData = response.data?.data || {};
+      const userData = {
+        ...backendData,
+        name: backendData.fullName || backendData.name || data.fullName,
+        email: backendData.email || data.email,
+        phone: backendData.phoneNumber || backendData.phone || data.phoneNumber
+      };
+      
+      // Tự động đăng nhập sau khi đăng ký thành công
+      localStorage.setItem("lotus_user", JSON.stringify(userData));
+      setUser(userData);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
+      throw new Error(errorMsg);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await axios.post("/api/auth/logout");
+    } catch (e) {
+      console.warn("Lỗi khi gọi API logout", e);
+    } finally {
+      localStorage.removeItem("lotus_user");
+      setUser(null);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn: !!user, user, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn: !!user, user, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

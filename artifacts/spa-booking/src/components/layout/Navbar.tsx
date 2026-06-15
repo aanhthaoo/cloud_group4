@@ -15,7 +15,8 @@ export default function Navbar() {
     setLocation("/");
   };
 
-  const initials = user?.name
+  const userName = user?.name || "User";
+  const initials = userName
     .split(" ")
     .slice(-2)
     .map((w) => w[0])
@@ -55,7 +56,7 @@ export default function Navbar() {
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary-foreground flex items-center justify-center text-white text-xs font-bold">
                     {initials}
                   </div>
-                  <span className="text-sm font-medium text-foreground max-w-[100px] truncate">{user?.name.split(" ").pop()}</span>
+                  <span className="text-sm font-medium text-foreground max-w-[100px] truncate">{userName.split(" ").pop()}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
 
