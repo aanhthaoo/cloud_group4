@@ -4,9 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "echo 'Mock server disabled'",
+    "build": "echo 'Mock server disabled'",
+    "preview": "echo 'Mock server disabled'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

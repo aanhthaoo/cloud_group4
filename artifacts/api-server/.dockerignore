@@ -1,0 +1,6 @@
+node_modules
+npm-debug.log
+.env
+service-account.json
+Dockerfile
+.dockerignore
