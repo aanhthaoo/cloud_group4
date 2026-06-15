@@ -11,6 +11,11 @@ app.use(express.json());
 const indexRoutes = require('./routes/index.routes.js');
 app.use('/', indexRoutes);
 
+// Route gốc
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'API Server is running.' });
+});
+
 // API kiểm tra trạng thái
 app.get('/api/health', async (req, res) => {
   try {
@@ -44,10 +49,11 @@ app.listen(PORT, '0.0.0.0', () => {
     });
   });
 
-  console.log('\n  API Server ready!\n');
-  console.log(`  ➜  Local:   http://localhost:${PORT}/`);
+  console.log('\n  ✅ API Server ready!\n');
+  console.log(`  ▶  Backend Local:    http://localhost:${PORT}/`);
+  console.log(`  ▶  Frontend Local:   http://localhost:5173/`);
   networkIPs.forEach(ip => {
-    console.log(`  ➜  Network: http://${ip}:${PORT}/`);
+    console.log(`  ▶  Frontend Network: http://${ip}:5173/`);
   });
   console.log('');
 });

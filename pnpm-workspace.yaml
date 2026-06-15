@@ -78,6 +78,11 @@ overrides:
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
+  # Force gcp-metadata and google-auth-library to a single version across all packages.
+  # This fixes the "gcpMetadata.universe is not a function" error caused by a version
+  # conflict between firebase-admin and @google-cloud/pubsub sub-dependencies.
+  gcp-metadata: "^8.1.0"
+  google-auth-library: "^10.0.0"
 
 allowBuilds:
   '@firebase/util': true

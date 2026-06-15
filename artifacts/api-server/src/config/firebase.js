@@ -25,7 +25,12 @@ if (!admin.apps.length) {
     }
 
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.credential.cert({
+        ...serviceAccount,
+        // Thêm universe_domain để tránh firebase-admin gọi gcpMetadata.universe()
+        // (bị lỗi do version conflict giữa firebase-admin và @google-cloud/pubsub)
+        universe_domain: serviceAccount.universe_domain || 'googleapis.com',
+      }),
       projectId: serviceAccount.project_id,
     });
     console.log('✅ Firebase Admin SDK initialized. Project:', serviceAccount.project_id);
