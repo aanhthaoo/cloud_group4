@@ -2,23 +2,24 @@ const express = require('express');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { s3Client } = require('../config/r2');
+const authRoutes = require('./auth.routes');
 
 const router = express.Router();
 
+router.use('/api/auth', authRoutes);
+
 router.get('/api/availability', (req, res) => {
+  // TODO: Tích hợp logic lấy dữ liệu availability thực tế
   res.status(200).json({
     message: 'Availability data',
-    data: [
-      { date: '2023-12-01', timeSlots: ['09:00', '10:00', '14:00'] },
-      { date: '2023-12-02', timeSlots: ['11:00', '15:00'] }
-    ]
+    data: []
   });
 });
 
 router.post('/api/bookings', (req, res) => {
-  res.status(200).json({
-    message: 'Booking created successfully (mock)',
-    bookingId: 'mock-booking-123'
+  // TODO: Tích hợp logic tạo booking thực tế
+  res.status(501).json({
+    message: 'Chức năng tạo booking chưa được implement'
   });
 });
 

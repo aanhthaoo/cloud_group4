@@ -5,32 +5,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { AlertCircle } from "lucide-react";
-
-const MOCK_ACCOUNTS = [
-  { email: "hoa@lotusglow.vn", password: "123456", name: "Nguyễn Thị Hoa" },
-  { email: "admin@lotusglow.vn", password: "admin123", name: "Quản lý Spa" },
-];
+import { toast } from "sonner";
 
 export default function Login() {
   const { login } = useAuth();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    const matched = MOCK_ACCOUNTS.find(
-      (a) => a.email === email.trim() && a.password === password
-    );
-    if (!matched) {
-      setError("Email hoặc mật khẩu không đúng. Vui lòng thử lại.");
+    if (!email.trim() || !password) {
+      toast.error("Vui lòng nhập đầy đủ email và mật khẩu");
       return;
     }
-    login(email.trim(), matched.name);
-    setLocation("/");
+
+    setIsLoading(true);
+    try {
+      await login(email.trim(), password);
+      toast.success("Đăng nhập thành công!");
+      setLocation("/");
+    } catch (err: any) {
+      toast.error(err.message || "Đã có lỗi xảy ra");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -47,36 +47,6 @@ export default function Login() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-5 pt-4">
-            {/* Mock credentials hint */}
-            <div className="bg-secondary/40 border border-secondary-foreground/20 rounded-xl p-4 text-xs space-y-2">
-              <p className="font-semibold text-secondary-foreground text-sm">Tài khoản demo:</p>
-              <div className="space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Email:</span>
-                  <button
-                    type="button"
-                    className="font-mono font-medium text-primary hover:underline"
-                    onClick={() => { setEmail("hoa@lotusglow.vn"); setPassword("123456"); }}
-                  >
-                    hoa@lotusglow.vn
-                  </button>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Mật khẩu:</span>
-                  <span className="font-mono font-medium">123456</span>
-                </div>
-              </div>
-              <p className="text-muted-foreground text-[11px] pt-1">Nhấn vào email để tự động điền.</p>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm" data-testid="text-login-error">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {error}
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="email">Email / Số điện thoại</Label>
               <Input
@@ -87,6 +57,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 data-testid="input-login-email"
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -104,12 +75,18 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="input-login-password"
+                disabled={isLoading}
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 pb-8">
-            <Button type="submit" className="w-full h-12 text-lg shadow-sm" data-testid="button-login-submit">
-              Đăng nhập
+            <Button 
+              type="submit" 
+              className="w-full h-12 text-lg shadow-sm" 
+              data-testid="button-login-submit"
+              disabled={isLoading}
+            >
+              {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
             <div className="text-center text-sm text-muted-foreground">
               Chưa có tài khoản?{" "}

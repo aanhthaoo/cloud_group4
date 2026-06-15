@@ -17,7 +17,8 @@ export default function Profile() {
 
   if (!user) return null;
 
-  const initials = user.name
+  const userName = user.name || "User";
+  const initials = userName
     .split(" ")
     .slice(-2)
     .map((w) => w[0])
@@ -37,7 +38,7 @@ export default function Profile() {
             </div>
             <div className="flex-1 space-y-1.5">
               <h2 className="text-xl font-semibold text-foreground" data-testid="text-profile-name">
-                {user.name}
+                {userName}
               </h2>
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Mail className="w-3.5 h-3.5" />
