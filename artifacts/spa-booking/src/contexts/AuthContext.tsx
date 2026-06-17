@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
-import axios from "axios";
+import api from "../lib/axios";
 
 interface User {
   name: string;
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password?: string) => {
     try {
-      const response = await axios.post("/api/auth/login", { email, password });
+      const response = await api.post("/api/auth/login", { email, password });
       
       const backendData = response.data?.data || {};
       const userData = {
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (data: { email: string; password?: string; fullName: string; phoneNumber: string }) => {
     try {
-      const response = await axios.post("/api/auth/register", data);
+      const response = await api.post("/api/auth/register", data);
       
       const backendData = response.data?.data || {};
       const userData = {
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await axios.post("/api/auth/logout");
+      await api.post("/api/auth/logout");
     } catch (e) {
       console.warn("Lỗi khi gọi API logout", e);
     } finally {
