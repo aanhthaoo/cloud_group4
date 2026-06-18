@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-// Trigger restart to load new env vars
+const path = require('path');
 
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 require('dotenv').config();
 const { db } = require('./config/firebase'); // Gọi kết nối từ tệp cấu hình
 

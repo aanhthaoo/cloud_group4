@@ -1,33 +1,165 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Headphones } from "lucide-react";
+import { Headphones, Loader2, MessageCircle, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import api from "@/lib/axios";
+
+declare global {
+  interface Window {
+    HubSpotConversations?: {
+      widget?: {
+        load?: () => void;
+        open?: () => void;
+        refresh?: () => void;
+      };
+    };
+    hsConversationsOnReady?: Array<() => void>;
+  }
+}
 
 interface Message {
   id: number;
-  from: "bot" | "system";
+  from: "bot" | "user" | "system";
   text: string;
 }
 
+interface ChatResponse {
+  reply: string;
+  intent: string;
+  languageCode: "vi" | "en";
+  handoffRequired: boolean;
+}
+
+type HandoffStatus = "idle" | "connecting" | "connected";
+
 const initialMessages: Message[] = [
-  { id: 1, from: "bot", text: "Xin chào! Tôi là trợ lý ảo của LotusGlow Spa. 🌸" },
-  { id: 2, from: "bot", text: "Tôi có thể giúp gì cho bạn hôm nay?" },
+  { id: 1, from: "bot", text: "Xin chào! Mình là lễ tân AI của LotusGlow Spa." },
+  { id: 2, from: "bot", text: "Bạn muốn hỏi giờ mở cửa, xem bảng giá, làm trắc nghiệm tư vấn hay gặp nhân viên?" },
 ];
 
+const hubSpotPortalId = import.meta.env.VITE_HUBSPOT_PORTAL_ID;
+const hubSpotScriptHost = import.meta.env.VITE_HUBSPOT_SCRIPT_HOST || "js-na2.hs-scripts.com";
+
+function createSessionId() {
+  return `lotus-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getSessionId() {
+  const storageKey = "lotus_chat_session_id";
+  const existing = localStorage.getItem(storageKey);
+
+  if (existing) {
+    return existing;
+  }
+
+  const sessionId = createSessionId();
+  localStorage.setItem(storageKey, sessionId);
+  return sessionId;
+}
+
+function waitForHubSpotWidget(timeoutMs = 8000) {
+  return new Promise<boolean>((resolve) => {
+    const startedAt = Date.now();
+
+    const checkReady = () => {
+      if (window.HubSpotConversations?.widget?.open) {
+        resolve(true);
+        return;
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve(false);
+        return;
+      }
+
+      setTimeout(checkReady, 250);
+    };
+
+    checkReady();
+  });
+}
+
+function loadHubSpotWidget() {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+
+    const finish = (loaded: boolean) => {
+      if (!settled) {
+        settled = true;
+        resolve(loaded);
+      }
+    };
+
+    if (!hubSpotPortalId) {
+      finish(false);
+      return;
+    }
+
+    if (window.HubSpotConversations?.widget) {
+      finish(true);
+      return;
+    }
+
+    window.hsConversationsOnReady = window.hsConversationsOnReady || [];
+    window.hsConversationsOnReady.push(() => finish(true));
+
+    const existingScript = document.getElementById("hs-script-loader");
+    if (existingScript) {
+      existingScript.addEventListener("load", () => finish(true), { once: true });
+      waitForHubSpotWidget().then(finish);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "hs-script-loader";
+    script.async = true;
+    script.defer = true;
+    script.src = `https://${hubSpotScriptHost}/${hubSpotPortalId}.js`;
+    script.onload = () => waitForHubSpotWidget().then(finish);
+    script.onerror = () => finish(false);
+    document.body.appendChild(script);
+  });
+}
+
+async function openHubSpotChat() {
+  const loaded = await loadHubSpotWidget();
+
+  if (loaded && window.HubSpotConversations?.widget?.load) {
+    window.HubSpotConversations.widget.load();
+  }
+
+  if (loaded && window.HubSpotConversations?.widget?.open) {
+    window.HubSpotConversations.widget.open();
+    return true;
+  }
+
+  if (hubSpotPortalId) {
+    window.location.hash = "hs-chat-open";
+    return true;
+  }
+
+  return false;
+}
+
 export default function ChatWidget() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [handoffTriggered, setHandoffTriggered] = useState(false);
+  const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [handoffStatus, setHandoffStatus] = useState<HandoffStatus>("idle");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const sessionId = useMemo(getSessionId, []);
 
   useEffect(() => {
     if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isOpen]);
+  }, [messages, isOpen, isSending]);
 
   const handleToggle = () => {
     if (!isLoggedIn) {
@@ -37,13 +169,89 @@ export default function ChatWidget() {
     setIsOpen((v) => !v);
   };
 
-  const handleHandoff = () => {
-    if (handoffTriggered) return;
-    setHandoffTriggered(true);
-    setMessages((prev) => [
-      ...prev,
-      { id: Date.now(), from: "system", text: "Đang kết nối bạn với nhân viên hỗ trợ... Vui lòng chờ trong giây lát." },
-    ]);
+  const appendSystemMessage = (text: string) => {
+    setMessages((prev) => [...prev, { id: Date.now(), from: "system", text }]);
+  };
+
+  const handleHandoff = async (currentMessages = messages) => {
+    if (handoffStatus === "connecting") return;
+
+    setHandoffStatus("connecting");
+    appendSystemMessage("Đang kết nối bạn với nhân viên hỗ trợ...");
+
+    try {
+      await api.post("/api/chat/handoff", {
+        sessionId,
+        user,
+        transcript: currentMessages.map(({ from, text }) => ({ from, text })),
+      });
+
+      const opened = await openHubSpotChat();
+      appendSystemMessage(
+        opened
+          ? "Đã mở HubSpot LiveChat. Hãy gửi tin nhắn trong cửa sổ HubSpot để nhân viên nhận được trong Inbox."
+          : "Chưa mở được HubSpot LiveChat. Kiểm tra VITE_HUBSPOT_PORTAL_ID, chatflow Published/On và Target All pages.",
+      );
+      setHandoffStatus(opened ? "connected" : "idle");
+      if (opened) {
+        setIsOpen(false);
+      }
+    } catch (error) {
+      console.error("Handoff error:", error);
+      appendSystemMessage("Chưa thể chuyển sang nhân viên lúc này. Bạn vui lòng thử lại sau.");
+      setHandoffStatus("idle");
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    const messageText = input.trim();
+    if (!messageText || isSending) return;
+
+    const userMessage: Message = {
+      id: Date.now(),
+      from: "user",
+      text: messageText,
+    };
+
+    const messagesWithUser = [...messages, userMessage];
+    setMessages(messagesWithUser);
+    setInput("");
+    setIsSending(true);
+
+    try {
+      const response = await api.post<ChatResponse>("/api/chat/message", {
+        sessionId,
+        message: messageText,
+        user,
+      });
+
+      const botMessage: Message = {
+        id: Date.now() + 1,
+        from: "bot",
+        text: response.data.reply,
+      };
+      const nextMessages = [...messagesWithUser, botMessage];
+
+      setMessages(nextMessages);
+
+      if (response.data.handoffRequired) {
+        await handleHandoff(nextMessages);
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          from: "system",
+          text: "Mình chưa thể kết nối AI lúc này. Bạn vui lòng thử lại sau.",
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -57,7 +265,7 @@ export default function ChatWidget() {
             transition={{ duration: 0.2 }}
             className="mb-4 origin-bottom-right"
           >
-            <Card className="w-[320px] shadow-xl border-primary/20">
+            <Card className="w-[340px] shadow-xl border-primary/20">
               <CardHeader className="bg-primary/10 py-3 px-4 flex flex-row items-center justify-between rounded-t-lg border-b border-primary/10">
                 <div className="font-medium text-foreground flex items-center gap-2">
                   <span className="relative flex h-3 w-3">
@@ -71,46 +279,82 @@ export default function ChatWidget() {
                 </Button>
               </CardHeader>
 
-              <CardContent className="p-4 flex flex-col gap-3 h-[240px] overflow-y-auto bg-slate-50/50">
-                {messages.map((msg) =>
-                  msg.from === "bot" ? (
-                    <div key={msg.id} className="flex gap-2">
-                      <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs shrink-0">AI</div>
-                      <div className="bg-white border border-border rounded-2xl rounded-tl-none p-3 text-sm shadow-sm">{msg.text}</div>
-                    </div>
-                  ) : (
-                    <div key={msg.id} className="flex gap-2">
-                      <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                        <Headphones className="w-4 h-4 text-secondary-foreground" />
+              <CardContent className="p-4 flex flex-col gap-3 h-[320px] overflow-y-auto bg-slate-50/50">
+                {messages.map((msg) => {
+                  if (msg.from === "user") {
+                    return (
+                      <div key={msg.id} className="flex justify-end">
+                        <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none p-3 text-sm shadow-sm max-w-[78%]">
+                          {msg.text}
+                        </div>
                       </div>
-                      <div className="bg-secondary/30 border border-secondary/40 rounded-2xl rounded-tl-none p-3 text-sm text-secondary-foreground shadow-sm">{msg.text}</div>
+                    );
+                  }
+
+                  return (
+                    <div key={msg.id} className="flex gap-2">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs shrink-0 ${msg.from === "bot" ? "bg-primary/20 text-primary" : "bg-secondary"}`}>
+                        {msg.from === "bot" ? "AI" : <Headphones className="w-4 h-4 text-secondary-foreground" />}
+                      </div>
+                      <div className={`border rounded-2xl rounded-tl-none p-3 text-sm shadow-sm max-w-[78%] ${msg.from === "bot" ? "bg-white border-border" : "bg-secondary/30 border-secondary/40 text-secondary-foreground"}`}>
+                        {msg.text}
+                      </div>
                     </div>
-                  )
+                  );
+                })}
+                {isSending && (
+                  <div className="flex gap-2">
+                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs shrink-0">AI</div>
+                    <div className="bg-white border border-border rounded-2xl rounded-tl-none p-3 text-sm shadow-sm flex items-center gap-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Đang trả lời...
+                    </div>
+                  </div>
                 )}
                 <div ref={bottomRef} />
               </CardContent>
 
               <CardFooter className="p-3 bg-white border-t flex flex-col gap-2 rounded-b-lg">
+                <form onSubmit={handleSubmit} className="flex gap-2 w-full">
+                  <Input
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    placeholder="Nhập tin nhắn..."
+                    disabled={isSending}
+                    data-testid="input-chat-message"
+                    className="h-9"
+                  />
+                  <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={isSending || !input.trim()} data-testid="button-send-chat">
+                    {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </form>
+
                 <div className="flex gap-2 w-full">
                   <Link href="/booking" onClick={() => setIsOpen(false)} className="flex-1">
                     <Button variant="outline" size="sm" className="w-full text-xs text-primary border-primary hover:bg-primary hover:text-primary-foreground" data-testid="button-chat-booking">
                       Đặt lịch ngay
                     </Button>
                   </Link>
-                  <Button variant="outline" size="sm" className="flex-1 text-xs text-secondary-foreground border-secondary-foreground hover:bg-secondary hover:text-secondary-foreground" onClick={() => setIsOpen(false)} data-testid="button-chat-services">
-                    Xem dịch vụ
-                  </Button>
+                  <Link href="/services" onClick={() => setIsOpen(false)} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs text-secondary-foreground border-secondary-foreground hover:bg-secondary hover:text-secondary-foreground" data-testid="button-chat-services">
+                      Xem dịch vụ
+                    </Button>
+                  </Link>
                 </div>
                 <Button
-                  variant={handoffTriggered ? "ghost" : "outline"}
+                  variant={handoffStatus !== "idle" ? "ghost" : "outline"}
                   size="sm"
-                  className={`w-full text-xs gap-1.5 ${handoffTriggered ? "text-muted-foreground cursor-default" : "text-orange-600 border-orange-300 hover:bg-orange-50 hover:border-orange-400"}`}
-                  onClick={handleHandoff}
-                  disabled={handoffTriggered}
+                  className={`w-full text-xs gap-1.5 ${handoffStatus !== "idle" ? "text-muted-foreground cursor-default" : "text-orange-600 border-orange-300 hover:bg-orange-50 hover:border-orange-400"}`}
+                  onClick={() => handleHandoff()}
+                  disabled={handoffStatus === "connecting"}
                   data-testid="button-chat-handoff"
                 >
                   <Headphones className="w-3.5 h-3.5" />
-                  {handoffTriggered ? "Đang kết nối nhân viên..." : "Gặp nhân viên hỗ trợ"}
+                  {handoffStatus === "connecting"
+                    ? "Đang kết nối nhân viên..."
+                    : handoffStatus === "connected"
+                    ? "Đã chuyển sang HubSpot"
+                    : "Gặp nhân viên hỗ trợ"}
                 </Button>
               </CardFooter>
             </Card>

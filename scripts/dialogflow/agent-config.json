@@ -1,0 +1,384 @@
+{
+  "agent": {
+    "displayName": "Kich_Ban_Dat_Lich_New",
+    "defaultLanguageCode": "vi",
+    "supportedLanguageCodes": ["en"],
+    "timeZone": "Asia/Ho_Chi_Minh",
+    "description": "Kịch bản lễ tân ảo AI cho LotusGlow Spa: FAQ, trắc nghiệm tư vấn dịch vụ, đặt lịch và chuyển tiếp nhân viên."
+  },
+  "legacyIntentNames": [
+    "faq.opening_hours",
+    "faq.price",
+    "service.recommendation",
+    "booking.intent",
+    "handoff.request"
+  ],
+  "entityTypes": [
+    {
+      "displayName": "service_type",
+      "entitiesVi": [
+        {
+          "value": "massage",
+          "synonyms": ["massage", "massage thư giãn", "body", "trị liệu", "đau vai", "đau lưng", "thư giãn"]
+        },
+        {
+          "value": "facial",
+          "synonyms": ["chăm sóc da", "da mặt", "facial", "làm sạch da", "cấp ẩm", "mụn", "da khô"]
+        },
+        {
+          "value": "nails",
+          "synonyms": ["nail", "nails", "móng", "làm móng", "pedicure", "manicure"]
+        },
+        {
+          "value": "waxing",
+          "synonyms": ["waxing", "tẩy lông", "triệt lông", "sáp"]
+        },
+        {
+          "value": "bridal",
+          "synonyms": ["cô dâu", "gói cô dâu", "cưới", "ngày cưới", "sự kiện đặc biệt"]
+        }
+      ],
+      "entitiesEn": [
+        {
+          "value": "massage",
+          "synonyms": ["massage", "relaxing massage", "body massage", "therapy", "shoulder pain", "back pain", "relax"]
+        },
+        {
+          "value": "facial",
+          "synonyms": ["facial", "skin care", "face care", "deep cleansing", "hydration", "acne", "dry skin"]
+        },
+        {
+          "value": "nails",
+          "synonyms": ["nail", "nails", "manicure", "pedicure", "nail care"]
+        },
+        {
+          "value": "waxing",
+          "synonyms": ["waxing", "hair removal", "wax"]
+        },
+        {
+          "value": "bridal",
+          "synonyms": ["bridal", "bride package", "wedding", "wedding day", "special event"]
+        }
+      ]
+    },
+    {
+      "displayName": "budget_range",
+      "entitiesVi": [
+        {
+          "value": "low",
+          "synonyms": ["dưới 300k", "dưới 300 nghìn", "rẻ", "tiết kiệm", "giá thấp"]
+        },
+        {
+          "value": "medium",
+          "synonyms": ["300k đến 600k", "tầm trung", "vừa phải", "khoảng 500k", "bình dân"]
+        },
+        {
+          "value": "high",
+          "synonyms": ["trên 600k", "cao cấp", "premium", "không quan trọng giá", "gói tốt nhất"]
+        }
+      ],
+      "entitiesEn": [
+        {
+          "value": "low",
+          "synonyms": ["under 300k", "cheap", "budget", "low price", "affordable"]
+        },
+        {
+          "value": "medium",
+          "synonyms": ["300k to 600k", "mid range", "moderate", "around 500k", "reasonable"]
+        },
+        {
+          "value": "high",
+          "synonyms": ["over 600k", "premium", "high end", "best package", "price does not matter"]
+        }
+      ]
+    },
+    {
+      "displayName": "handoff_signal",
+      "entitiesVi": [
+        {
+          "value": "human",
+          "synonyms": ["gặp nhân viên", "tư vấn viên", "người thật", "hỗ trợ trực tiếp", "gọi nhân viên", "nói chuyện với nhân viên"]
+        }
+      ],
+      "entitiesEn": [
+        {
+          "value": "human",
+          "synonyms": ["staff", "human agent", "real person", "live support", "talk to staff", "consultant"]
+        }
+      ]
+    }
+  ],
+  "intents": [
+    {
+      "displayName": "Default Welcome Intent",
+      "trainingPhrasesVi": [
+        "Xin chào",
+        "Chào spa",
+        "Tư vấn giúp mình",
+        "Mình cần hỗ trợ"
+      ],
+      "trainingPhrasesEn": [
+        "Hello",
+        "Hi spa",
+        "Can you advise me?",
+        "I need support"
+      ],
+      "responsesVi": [
+        "Xin chào, mình là lễ tân AI của LotusGlow Spa. Bạn muốn hỏi giờ mở cửa, xem bảng giá, làm trắc nghiệm tư vấn dịch vụ hay gặp nhân viên?"
+      ],
+      "responsesEn": [
+        "Hello, I am the AI receptionist of LotusGlow Spa. Would you like to ask about opening hours, prices, service recommendations, booking, or talk to staff?"
+      ]
+    },
+    {
+      "displayName": "FAQ - GioMoCua",
+      "trainingPhrasesVi": [
+        "Spa mở cửa mấy giờ?",
+        "Giờ làm việc thế nào?",
+        "Hôm nay có mở cửa không?",
+        "Mấy giờ đóng cửa?",
+        "LotusGlow làm việc từ mấy giờ đến mấy giờ?"
+      ],
+      "trainingPhrasesEn": [
+        "What time does the spa open?",
+        "What are your opening hours?",
+        "Are you open today?",
+        "What time do you close?",
+        "When is LotusGlow open?"
+      ],
+      "responsesVi": [
+        "LotusGlow Spa mở cửa từ 09:00 đến 20:00 hằng ngày. Bạn muốn mình kiểm tra lịch trống hôm nay không?"
+      ],
+      "responsesEn": [
+        "LotusGlow Spa is open daily from 09:00 to 20:00. Would you like me to check today's available slots?"
+      ]
+    },
+    {
+      "displayName": "FAQ - BangGia",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "trainingPhrasesVi": [
+        "Cho mình xin bảng giá",
+        "Massage bao nhiêu tiền?",
+        "Chăm sóc da giá bao nhiêu?",
+        "Có dịch vụ nào dưới 500k không?",
+        "Giá dịch vụ hiện tại là bao nhiêu?"
+      ],
+      "trainingPhrasesEn": [
+        "Can I see the price list?",
+        "How much is a massage?",
+        "How much does facial care cost?",
+        "Do you have any service under 500k?",
+        "What are the current service prices?"
+      ],
+      "responsesVi": [
+        "Mình sẽ kiểm tra danh sách dịch vụ và bảng giá hiện tại cho bạn."
+      ],
+      "responsesEn": [
+        "I will check the current service list and prices for you."
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 1 - BatDau",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        },
+        {
+          "displayName": "budget_range",
+          "entityTypeDisplayName": "@budget_range",
+          "value": "$budget_range"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Tư vấn giúp mình dịch vụ phù hợp",
+        "Mình chưa biết nên chọn dịch vụ nào",
+        "Cho mình làm trắc nghiệm",
+        "Mình muốn được gợi ý dịch vụ",
+        "Spa có thể tư vấn cho mình không?",
+        "Mình có ngân sách khoảng 500k thì nên chọn gì?"
+      ],
+      "trainingPhrasesEn": [
+        "Can you recommend a suitable service?",
+        "I do not know which service to choose",
+        "Can I take a quick quiz?",
+        "I want a service recommendation",
+        "Can the spa advise me?",
+        "My budget is around 500k, what should I choose?"
+      ],
+      "responsesVi": [
+        "Được rồi. Mình sẽ hỏi nhanh vài câu để gợi ý dịch vụ phù hợp. Bạn đang muốn thư giãn cơ thể, chăm sóc da, làm móng hay chuẩn bị cho sự kiện đặc biệt?"
+      ],
+      "responsesEn": [
+        "Sure. I will ask a few quick questions to recommend a suitable service. Are you looking for body relaxation, skin care, nail care, or preparation for a special event?"
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 2 - ChamSocDa",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Da mình khô thì nên làm gì?",
+        "Mình muốn chăm sóc da mặt",
+        "Da mình hơi xỉn màu",
+        "Mình cần cấp ẩm cho da",
+        "Mặt mình cần làm sạch sâu",
+        "Tư vấn chăm sóc da cho mình"
+      ],
+      "trainingPhrasesEn": [
+        "What should I do for dry skin?",
+        "I want facial care",
+        "My skin looks dull",
+        "I need skin hydration",
+        "My face needs deep cleansing",
+        "Please advise me about skin care"
+      ],
+      "responsesVi": [
+        "Nếu bạn muốn chăm sóc da, mình sẽ ưu tiên các dịch vụ làm sạch sâu, cấp ẩm và phục hồi da. Bạn có đang gặp vấn đề mụn, da khô hay da xỉn màu không?"
+      ],
+      "responsesEn": [
+        "If you want skin care, I will prioritize deep cleansing, hydration, and recovery services. Are you dealing with acne, dry skin, or dull skin?"
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 3 - DaDauMun",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Da mình dầu mụn",
+        "Mình bị mụn thì chọn dịch vụ nào?",
+        "Da mặt mình nhiều dầu",
+        "Mình muốn xử lý mụn",
+        "Da mình dễ nổi mụn",
+        "Có dịch vụ cho da dầu mụn không?"
+      ],
+      "trainingPhrasesEn": [
+        "I have oily acne-prone skin",
+        "Which service should I choose for acne?",
+        "My face is oily",
+        "I want to treat acne",
+        "My skin breaks out easily",
+        "Do you have a service for oily acne-prone skin?"
+      ],
+      "responsesVi": [
+        "Với da dầu mụn, mình gợi ý nhóm chăm sóc da làm sạch sâu và phục hồi nhẹ. Mình sẽ kiểm tra dịch vụ phù hợp trong danh mục hiện tại cho bạn."
+      ],
+      "responsesEn": [
+        "For oily acne-prone skin, I recommend deep cleansing and gentle recovery skin care. I will check suitable services from the current catalog for you."
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 4 - ThuGianDauVai",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Mình bị đau vai",
+        "Mình đau lưng nên chọn dịch vụ nào?",
+        "Mình muốn massage thư giãn",
+        "Cơ thể mình mỏi quá",
+        "Có dịch vụ massage body không?",
+        "Mình muốn thư giãn toàn thân"
+      ],
+      "trainingPhrasesEn": [
+        "My shoulders hurt",
+        "Which service should I choose for back pain?",
+        "I want a relaxing massage",
+        "My body feels tired",
+        "Do you have body massage?",
+        "I want full body relaxation"
+      ],
+      "responsesVi": [
+        "Với nhu cầu thư giãn hoặc đau vai lưng, mình sẽ ưu tiên dịch vụ massage trị liệu hoặc massage thư giãn toàn thân. Mình kiểm tra lịch trống cho bạn nhé?"
+      ],
+      "responsesEn": [
+        "For relaxation or shoulder and back pain, I will prioritize therapy massage or full-body relaxation massage. Would you like me to check available slots?"
+      ]
+    },
+    {
+      "displayName": "DatLich - KiemTraLichTrong",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Mình muốn đặt lịch",
+        "Đặt lịch cho mình",
+        "Còn lịch trống hôm nay không?",
+        "Có slot lúc 3 giờ không?",
+        "Kiểm tra lịch trống giúp mình",
+        "Ngày mai còn kỹ thuật viên trống không?"
+      ],
+      "trainingPhrasesEn": [
+        "I want to book an appointment",
+        "Please book for me",
+        "Are there any available slots today?",
+        "Do you have a 3 PM slot?",
+        "Please check available slots for me",
+        "Is any technician available tomorrow?"
+      ],
+      "responsesVi": [
+        "Được rồi. Bạn vui lòng cho mình biết dịch vụ và ngày mong muốn, mình sẽ kiểm tra lịch trống cho bạn."
+      ],
+      "responsesEn": [
+        "Sure. Please tell me the service and preferred date, and I will check available slots for you."
+      ]
+    },
+    {
+      "displayName": "YeuCau - GapNhanVien",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "handoff_signal",
+          "entityTypeDisplayName": "@handoff_signal",
+          "value": "$handoff_signal"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Cho mình gặp nhân viên",
+        "Mình muốn tư vấn viên hỗ trợ",
+        "Nói chuyện với người thật",
+        "Bot không giải quyết được",
+        "Cần nhân viên tư vấn",
+        "Chuyển cho nhân viên giúp mình"
+      ],
+      "trainingPhrasesEn": [
+        "I want to talk to staff",
+        "I want a consultant to help me",
+        "Can I talk to a real person?",
+        "The bot cannot solve this",
+        "I need staff advice",
+        "Please transfer me to staff"
+      ],
+      "responsesVi": [
+        "Mình sẽ chuyển bạn sang nhân viên tư vấn. Toàn bộ nội dung trao đổi trước đó sẽ được gửi kèm để nhân viên tiếp tục hỗ trợ bạn."
+      ],
+      "responsesEn": [
+        "I will transfer you to a consultant. The previous conversation history will be included so the staff can continue helping you."
+      ]
+    }
+  ]
+}
