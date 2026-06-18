@@ -3,10 +3,14 @@ const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { s3Client } = require('../config/r2');
 const authRoutes = require('./auth.routes');
+const giaoDichRoutes = require('./giaoDich.route');
 
 const router = express.Router();
 
 router.use('/api/auth', authRoutes);
+
+// Tích hợp phân hệ Giao dịch Lõi (Giữ chỗ & VietQR)
+router.use('/api', giaoDichRoutes);
 
 router.get('/api/availability', (req, res) => {
   // TODO: Tích hợp logic lấy dữ liệu availability thực tế
