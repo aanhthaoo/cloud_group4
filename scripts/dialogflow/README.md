@@ -39,3 +39,13 @@ The current `service-account.json` account is useful for backend runtime, but it
 - `dialogflow.intents.create`
 
 In practice, for class-project setup, the project owner can run the script once, or grant the backend service account an appropriate Dialogflow role plus Service Usage Admin for the API enable step.
+
+## HubSpot handoff transcript
+
+To save the AI transcript into HubSpot CRM when handing off to a human, create a HubSpot Private App token with contact and note read/write scopes, then add it to the backend environment:
+
+```env
+HUBSPOT_PRIVATE_APP_TOKEN=pat-...
+```
+
+If this token is missing, the web app can still open HubSpot LiveChat, but the transcript note will not be saved to the contact timeline.

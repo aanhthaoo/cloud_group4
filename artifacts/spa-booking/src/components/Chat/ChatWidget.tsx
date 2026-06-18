@@ -32,6 +32,25 @@ interface ChatResponse {
   intent: string;
   languageCode: "vi" | "en";
   handoffRequired: boolean;
+  handoffReason?: "user_requested" | "fallback_limit" | "low_confidence";
+  confidence: number;
+  isFallback: boolean;
+}
+
+interface HandoffResponse {
+  ok: boolean;
+  provider: "hubspot";
+  openWidget: boolean;
+  hubspotSaved: boolean;
+  contactId?: string;
+  noteId?: string;
+  hubspotError?: string;
+}
+
+interface HandoffMetadata {
+  handoffReason?: ChatResponse["handoffReason"];
+  lastIntent?: string;
+  lastConfidence?: number;
 }
 
 type HandoffStatus = "idle" | "connecting" | "connected";
@@ -173,25 +192,30 @@ export default function ChatWidget() {
     setMessages((prev) => [...prev, { id: Date.now(), from: "system", text }]);
   };
 
-  const handleHandoff = async (currentMessages = messages) => {
+  const handleHandoff = async (currentMessages = messages, metadata: HandoffMetadata = {}) => {
     if (handoffStatus === "connecting") return;
 
     setHandoffStatus("connecting");
     appendSystemMessage("Đang kết nối bạn với nhân viên hỗ trợ...");
 
     try {
-      await api.post("/api/chat/handoff", {
+      const handoffResponse = await api.post<HandoffResponse>("/api/chat/handoff", {
         sessionId,
         user,
         transcript: currentMessages.map(({ from, text }) => ({ from, text })),
+        metadata,
       });
 
       const opened = await openHubSpotChat();
-      appendSystemMessage(
-        opened
-          ? "Đã mở HubSpot LiveChat. Hãy gửi tin nhắn trong cửa sổ HubSpot để nhân viên nhận được trong Inbox."
-          : "Chưa mở được HubSpot LiveChat. Kiểm tra VITE_HUBSPOT_PORTAL_ID, chatflow Published/On và Target All pages.",
-      );
+
+      if (!opened) {
+        appendSystemMessage("Chưa mở được HubSpot LiveChat. Kiểm tra VITE_HUBSPOT_PORTAL_ID, chatflow Published/On và Target All pages.");
+      } else if (handoffResponse.data.hubspotSaved) {
+        appendSystemMessage("Đã mở HubSpot LiveChat. Transcript đã được lưu vào HubSpot CRM để nhân viên tiếp tục tư vấn.");
+      } else {
+        appendSystemMessage("Đã mở HubSpot LiveChat, nhưng transcript chưa lưu được vào HubSpot CRM. Bạn vẫn có thể gửi tin nhắn trong cửa sổ HubSpot để nhân viên nhận được.");
+      }
+
       setHandoffStatus(opened ? "connected" : "idle");
       if (opened) {
         setIsOpen(false);
@@ -237,7 +261,11 @@ export default function ChatWidget() {
       setMessages(nextMessages);
 
       if (response.data.handoffRequired) {
-        await handleHandoff(nextMessages);
+        await handleHandoff(nextMessages, {
+          handoffReason: response.data.handoffReason,
+          lastIntent: response.data.intent,
+          lastConfidence: response.data.confidence,
+        });
       }
     } catch (error) {
       console.error("Chat error:", error);
@@ -345,7 +373,7 @@ export default function ChatWidget() {
                   variant={handoffStatus !== "idle" ? "ghost" : "outline"}
                   size="sm"
                   className={`w-full text-xs gap-1.5 ${handoffStatus !== "idle" ? "text-muted-foreground cursor-default" : "text-orange-600 border-orange-300 hover:bg-orange-50 hover:border-orange-400"}`}
-                  onClick={() => handleHandoff()}
+                  onClick={() => handleHandoff(messages, { handoffReason: "user_requested" })}
                   disabled={handoffStatus === "connecting"}
                   data-testid="button-chat-handoff"
                 >

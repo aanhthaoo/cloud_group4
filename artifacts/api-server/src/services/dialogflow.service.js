@@ -5,6 +5,7 @@ const dialogflow = require('@google-cloud/dialogflow');
 const DEFAULT_PROJECT_ID = 'salon-499416';
 const DEFAULT_LANGUAGE = 'vi';
 const HANDOFF_INTENT = 'YeuCau - GapNhanVien';
+const FALLBACK_INTENT = 'Default Fallback Intent';
 
 let sessionsClient;
 
@@ -102,19 +103,25 @@ async function sendMessageToDialogflow({ sessionId, message, user }) {
   });
 
   const queryResult = response.queryResult || {};
-  const intent = queryResult.intent?.displayName || 'Default Fallback Intent';
+  const intent = queryResult.intent?.displayName || FALLBACK_INTENT;
   const reply = queryResult.fulfillmentText || fallbackReply(languageCode);
+  const confidence = queryResult.intentDetectionConfidence || 0;
+  const isFallback = intent === FALLBACK_INTENT;
+  const handoffRequired = intent === HANDOFF_INTENT;
 
   return {
     reply,
     intent,
     languageCode,
-    handoffRequired: intent === HANDOFF_INTENT,
-    confidence: queryResult.intentDetectionConfidence || 0,
+    handoffRequired,
+    handoffReason: handoffRequired ? 'user_requested' : undefined,
+    confidence,
+    isFallback,
   };
 }
 
 module.exports = {
+  FALLBACK_INTENT,
   HANDOFF_INTENT,
   detectLanguage,
   sendMessageToDialogflow,
