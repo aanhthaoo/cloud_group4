@@ -3,10 +3,12 @@ const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { s3Client } = require('../config/r2');
 const authRoutes = require('./auth.routes');
+const paymentRoutes = require('./payment.routes');
 
 const router = express.Router();
 
 router.use('/api/auth', authRoutes);
+router.use('/api/payments', paymentRoutes);
 
 router.get('/api/availability', (req, res) => {
   // TODO: Tích hợp logic lấy dữ liệu availability thực tế
