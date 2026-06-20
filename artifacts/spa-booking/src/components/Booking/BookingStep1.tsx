@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as ThuVienIcon from 'lucide-react';
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ export default function BookingStep1() {
   // 1. Quản lý trạng thái (State) 100% Tiếng Việt
   const [danh_sach_dich_vu, setDanhSachDichVu] = useState<any[]>([]);
   const [danh_sach_ktv, setDanhSachKtv] = useState<any[]>([]);
+  const [danh_sach_lich_ban, setDanhSachLichBan] = useState<string[]>([]);
   const [dang_tai, setDangTai] = useState(true);
 
   const [buoc_hien_tai, setBuocHienTai] = useState(1);
@@ -19,6 +20,12 @@ export default function BookingStep1() {
   const [ma_giao_dich, setMaGiaoDich] = useState<string | null>(null);
   const [link_qr_hien_tai, setLinkQrHienTai] = useState<string | null>(null);
   const [dang_gui, setDangGui] = useState(false);
+  const [hien_thong_bao_thanh_cong, setHienThongBaoThanhCong] = useState(false);
+
+  // --- TRẠNG THÁI MỚI CHO THANH TOÁN ĐẶC CỌC ---
+  const [file_bien_lai, setFileBienLai] = useState<File | null>(null);
+  const [da_xac_thuc_bot, setDaXacThucBot] = useState(false);
+  const vungChonFile = useRef<HTMLInputElement>(null);
 
   const mang_khung_gio = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30"];
 
@@ -28,6 +35,7 @@ export default function BookingStep1() {
         const phan_hoi = await axios.get("/api/thong-tin-dat-lich");
         setDanhSachDichVu(phan_hoi.data.danh_sach_dich_vu);
         setDanhSachKtv(phan_hoi.data.danh_sach_ktv);
+        setDanhSachLichBan(phan_hoi.data.danh_sach_lich_ban || []);
       } catch (loi) {
         console.error("Lỗi tải dữ liệu:", loi);
       } finally {
@@ -37,9 +45,9 @@ export default function BookingStep1() {
     taiDuLieu();
   }, []);
 
-  const kiemTraGioHopLe = (gio: string) => {
+  const kiemTraGioHopLe = (gio: string, ngay_da_chon_param: string) => {
     const hien_tai = new Date();
-    const ngay_chon = new Date(ngay_da_chon);
+    const ngay_chon = new Date(ngay_da_chon_param);
     if (ngay_chon.toDateString() !== hien_tai.toDateString()) return true;
 
     const [gio_hen, phut_hen] = gio.split(':').map(Number);
@@ -53,7 +61,7 @@ export default function BookingStep1() {
   };
 
   useEffect(() => {
-    if (gio_da_chon && !kiemTraGioHopLe(gio_da_chon)) {
+    if (gio_da_chon && !kiemTraGioHopLe(gio_da_chon, ngay_da_chon)) {
       setGioDaChon(null);
     }
   }, [ngay_da_chon]);
@@ -82,46 +90,174 @@ export default function BookingStep1() {
     }
   };
 
+  const xuLyXacNhanThanhToan = async () => {
+    try {
+      if (ma_giao_dich) {
+        await axios.post('/api/xac-nhan-thanh-toan', { id_giao_dich: ma_giao_dich });
+      }
+      setHienThongBaoThanhCong(true);
+    } catch (loi) {
+      console.error("Lỗi khi xác nhận thanh toán:", loi);
+      alert("Có lỗi xảy ra khi xác nhận hệ thống. Vui lòng thử lại.");
+    }
+  };
+
   if (dang_tai) return <div className="p-10 text-center text-primary animate-pulse font-bold text-lg font-serif">Đang kết nối Salon...</div>;
 
-  // --- GIAO DIỆN THANH TOÁN QR ---
-  if (ma_giao_dich && link_qr_hien_tai) {
-    return (
-      <div className="max-w-2xl mx-auto animate-in zoom-in-95 duration-500">
-        <div className="border border-gray-200 rounded-3xl p-8 md:p-12 shadow-xl bg-white text-center">
-          <h2 className="text-2xl font-serif font-bold text-gray-800 mb-6">Thanh toán đơn hàng</h2>
+  // --- GIAO DIỆN THANH TOÁN ĐẶT CỌC (Khi đã có mã giao dịch) ---
+  if (ma_giao_dich) {
+    const tong_cong = Number(dich_vu_da_chon.gia);
+    const tien_coc = Math.round(tong_cong * 0.3);
+    const tien_con_lai = tong_cong - tien_coc;
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div className="bg-white p-4 rounded-2xl shadow-inner border border-gray-100">
-              <img src={link_qr_hien_tai} alt="Mã VietQR" className="w-full h-auto rounded-lg" />
+    return (
+      <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
+        <h2 className="text-3xl font-serif font-bold text-center text-gray-800 mb-6">Thanh toán đặt cọc</h2>
+
+        <div className="grid md:grid-cols-2 gap-8 mt-8">
+          {/* CỘT TRÁI: HÓA ĐƠN & NGÂN HÀNG */}
+          <div className="space-y-6">
+            <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
+              <h3 className="text-lg font-bold text-gray-800 border-b border-gray-50 pb-3">Hóa đơn tạm tính</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Dịch vụ:</span>
+                  <span className="font-bold text-gray-800">{dich_vu_da_chon?.ten}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Kỹ thuật viên:</span>
+                  <span className="font-bold text-gray-800">{ktv_da_chon?.ten}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Ngày & Giờ:</span>
+                  <span className="font-bold text-gray-800">{gio_da_chon} • {new Date(ngay_da_chon).toLocaleDateString('vi-VN')}</span>
+                </div>
+                <div className="pt-3 border-t border-dashed flex justify-between">
+                  <span className="text-gray-600 font-bold">Tổng cộng:</span>
+                  <span className="font-bold text-gray-800">{tong_cong.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="flex justify-between items-center py-2 bg-primary/5 px-3 rounded-lg border border-primary/10">
+                  <span className="text-primary font-bold text-base">Đặt cọc (30%):</span>
+                  <span className="text-xl font-black text-primary">{tien_coc.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-400 italic">
+                  <span>Còn lại thanh toán tại Spa:</span>
+                  <span>{tien_con_lai.toLocaleString('vi-VN')}đ</span>
+                </div>
+              </div>
             </div>
 
-            <div className="text-left space-y-4">
-              <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
-                <p className="text-xs font-bold text-primary/60 uppercase mb-1 tracking-widest">Nội dung chuyển khoản</p>
-                <p className="text-xl font-black text-primary">LOTUSGLOW DH{ma_giao_dich}</p>
+            <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-6">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest text-center">Thông tin chuyển khoản</h3>
+              <div className="flex justify-center">
+                <div className="p-4 bg-white rounded-2xl shadow-inner border border-gray-100">
+                  <img src={link_qr_hien_tai || ""} alt="Mã VietQR" className="w-52 h-52 mx-auto" />
+                </div>
               </div>
-              <p className="text-sm text-gray-600 leading-relaxed italic">
-                Vui lòng giữ nguyên nội dung chuyển khoản <span className="font-bold text-gray-800 not-italic text-primary">LOTUSGLOW DH{ma_giao_dich}</span> để hệ thống tự động xác nhận lịch sau 30s.
-              </p>
-              <div className="pt-4">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 font-bold transition-all"
-                >
-                  Xong, về trang chủ
-                </button>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-400">Ngân hàng:</span> <span className="font-bold text-gray-700">MB Bank</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Tên tài khoản:</span> <span className="font-bold text-gray-700 uppercase">SPA LOTUSGLOW</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Số tài khoản:</span> <span className="font-black text-primary text-base">0377172930</span></div>
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-400 mb-1 font-bold">NỘI DUNG CHUYỂN KHOẢN:</p>
+                  <p className="font-black text-primary text-lg">LOTUSGLOW DH{ma_giao_dich}</p>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* CỘT PHẢI: UPLOAD & XÁC NHẬN */}
+          <div className="space-y-6">
+            <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
+              <h3 className="text-lg font-bold text-gray-800">Tải lên biên lai</h3>
+              <p className="text-xs text-gray-500">Vui lòng tải lên ảnh chụp màn hình chuyển khoản thành công.</p>
+
+              <input
+                type="file"
+                ref={vungChonFile}
+                onChange={(e) => setFileBienLai(e.target.files?.[0] || null)}
+                accept="image/*"
+                className="hidden"
+              />
+              <div
+                onClick={() => vungChonFile.current?.click()}
+                className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl flex flex-col items-center justify-center p-12 cursor-pointer hover:bg-primary/10 transition-all group"
+              >
+                <ThuVienIcon.UploadCloud className="w-10 h-10 text-primary/60 mb-3 group-hover:scale-110 transition-transform" />
+                {file_bien_lai ? (
+                  <p className="text-sm font-bold text-primary truncate max-w-full">{file_bien_lai.name}</p>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-primary">Kéo thả hoặc Nhấn để tải ảnh lên</p>
+                    <p className="text-[10px] text-gray-400 mt-1">PNG, JPG tối đa 5MB</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* reCAPTCHA Mock UI */}
+            <div className="border border-gray-200 rounded-xl p-4 bg-white flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-3">
+                <div
+                  onClick={() => setDaXacThucBot(!da_xac_thuc_bot)}
+                  className={`w-6 h-6 border-2 rounded flex items-center justify-center cursor-pointer transition-colors ${da_xac_thuc_bot ? "bg-green-500 border-green-500" : "border-gray-300"}`}
+                >
+                  {da_xac_thuc_bot && <ThuVienIcon.Check className="w-4 h-4 text-white" />}
+                </div>
+                <span className="text-sm font-medium text-gray-600">Tôi không phải robot</span>
+              </div>
+              <ThuVienIcon.ShieldCheck className="w-6 h-6 text-blue-500 opacity-30" />
+            </div>
+
+            <button
+              disabled={!file_bien_lai || !da_xac_thuc_bot}
+              onClick={xuLyXacNhanThanhToan}
+              className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-md active:scale-95 ${
+                (file_bien_lai && da_xac_thuc_bot)
+                  ? "bg-primary text-white hover:opacity-90"
+                  : "bg-primary/20 text-primary/60 cursor-not-allowed"
+              }`}
+            >
+              Xác nhận chốt lịch
+            </button>
+          </div>
         </div>
+
+        {hien_thong_bao_thanh_cong && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
+                <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl transform transition-all scale-100">
+                    {/* Icon Checkmark Vòng tròn hồng */}
+                    <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                        <svg className="w-10 h-10 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+
+                    {/* Nội dung thông báo */}
+                    <h3 className="text-2xl font-bold text-gray-800 mb-3 font-serif">
+                        Đã nhận biên lai!
+                    </h3>
+                    <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                        Cảm ơn bạn! LotusGlow đang tiến hành đối soát giao dịch bằng AI. Chúng tôi sẽ gửi thông báo xác nhận lịch hẹn trong giây lát.
+                    </p>
+
+                    {/* Nút hành động */}
+                    <button
+                        onClick={() => window.location.href = '/'}
+                        className="w-full bg-pink-300 text-white rounded-xl py-3.5 font-bold hover:bg-pink-400 transition-colors shadow-sm"
+                    >
+                        Về trang chủ
+                    </button>
+                </div>
+            </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="border border-gray-200 rounded-2xl p-6 md:p-8 shadow-sm bg-white font-sans">
-      {/* THANH TIẾN TRÌNH - SỬ DỤNG MÀU PRIMARY ĐỂ KHỚP VỚI LOGO */}
+      {/* THANH TIẾN TRÌNH */}
       <div className="flex items-center w-full mb-10 max-w-lg mx-auto px-4">
         <div className="flex flex-col items-center">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-300 ${buoc_hien_tai >= 1 ? 'bg-primary border-primary text-primary-foreground shadow-md' : 'bg-white border-gray-200 text-gray-400'}`}>1</div>
@@ -136,7 +272,7 @@ export default function BookingStep1() {
         </div>
       </div>
 
-      {/* GIAO DIỆN BƯỚC 1: CHỌN DỊCH VỤ & KTV */}
+      {/* BƯỚC 1: CHỌN DỊCH VỤ & KTV */}
       {buoc_hien_tai === 1 && (
         <div className="space-y-10 animate-in fade-in duration-500">
           <section>
@@ -152,7 +288,7 @@ export default function BookingStep1() {
                     key={dv.id}
                     onClick={() => setDichVuDaChon(dv)}
                     className={`p-5 cursor-pointer transition-all border-2 rounded-xl flex gap-4 items-center ${
-                      la_dang_chon ? "border-primary bg-primary/5 shadow-sm" : "border-gray-100 hover:border-primary/50 bg-white"
+                      la_dang_chon ? "border-primary bg-primary/10 shadow-sm" : "border-gray-100 hover:border-primary/50 bg-white"
                     }`}
                   >
                     <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center ${la_dang_chon ? 'bg-white text-primary shadow-sm' : 'bg-primary/10 text-primary'}`}>
@@ -165,7 +301,7 @@ export default function BookingStep1() {
                         <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1 uppercase tracking-tighter">
                           <ThuVienIcon.Clock className="w-3 h-3" /> {dv.thoi_gian} phút
                         </span>
-                        <span className="text-primary font-bold text-sm">{Number(dv.gia).toLocaleString()}đ</span>
+                        <span className="text-primary font-bold text-sm">{dv.gia.toLocaleString()}đ</span>
                       </div>
                     </div>
                   </div>
@@ -185,17 +321,13 @@ export default function BookingStep1() {
                     key={ktv.id}
                     onClick={() => setKtvDaChon(ktv)}
                     className={`p-4 cursor-pointer transition-all border-2 rounded-xl flex flex-col items-center text-center ${
-                      la_dang_chon ? "border-primary bg-primary/5 shadow-sm" : "border-gray-50 hover:border-primary/50 bg-white"
+                      la_dang_chon ? "border-primary bg-primary/10 shadow-sm" : "border-gray-50 hover:border-primary/50 bg-white"
                     }`}
                   >
                     <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg mb-3 border-2 border-white shadow-sm uppercase">
                       {chu_cai_dau}
                     </div>
                     <h4 className="font-bold text-gray-800 text-xs mb-1">{ktv.ten}</h4>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase mb-1 tracking-tighter">{ktv.vai_tro}</p>
-                    <div className="flex items-center gap-1 text-[10px] text-orange-400 font-bold">
-                      <ThuVienIcon.Star className="w-3 h-3 fill-current" /> {ktv.danh_gia}
-                    </div>
                   </div>
                 );
               })}
@@ -203,25 +335,24 @@ export default function BookingStep1() {
           </section>
 
           <div className="flex justify-end pt-4">
-            <Button
+            <button
               disabled={!dich_vu_da_chon || !ktv_da_chon}
               onClick={() => setBuocHienTai(2)}
-              className="bg-primary hover:opacity-90 text-primary-foreground px-8 py-6 rounded-lg font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+              className="bg-primary hover:opacity-90 text-primary-foreground px-10 py-3 rounded-lg font-bold transition-all flex items-center gap-2 disabled:opacity-50"
             >
               Tiếp tục <ThuVienIcon.ArrowRight className="w-4 h-4" />
-            </Button>
+            </button>
           </div>
         </div>
       )}
 
-      {/* GIAO DIỆN BƯỚC 2: CHỌN NGÀY GIỜ & TÓM TẮT */}
+      {/* BƯỚC 2: CHỌN THỜI GIAN */}
       {buoc_hien_tai === 2 && (
         <div className="animate-in slide-in-from-right-10 duration-500">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-10">
               <section>
                 <h3 className="text-xl font-bold text-gray-800 mb-8 uppercase tracking-tight">Thời gian hẹn</h3>
-
                 <div className="space-y-8">
                   <div>
                     <div className="flex items-center gap-2 mb-3">
@@ -236,7 +367,6 @@ export default function BookingStep1() {
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-primary outline-none transition-all font-medium text-gray-700"
                     />
                   </div>
-
                   <div>
                     <div className="flex items-center gap-2 mb-4">
                       <ThuVienIcon.Clock className="w-4 h-4 text-primary" />
@@ -244,19 +374,22 @@ export default function BookingStep1() {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {mang_khung_gio.map((gio) => {
-                        const hop_le = kiemTraGioHopLe(gio);
+                        const chuoi_kiem_tra = `${ngay_da_chon} ${gio}`;
+                        const bi_trung_lich = danh_sach_lich_ban.includes(chuoi_kiem_tra);
+                        const bi_qua_gio = !kiemTraGioHopLe(gio, ngay_da_chon);
+                        const bi_khoa = bi_qua_gio || bi_trung_lich;
                         const la_dang_chon = gio_da_chon === gio;
 
                         return (
                           <button
                             key={gio}
-                            disabled={!hop_le}
+                            disabled={bi_khoa}
                             onClick={() => setGioDaChon(gio)}
                             className={`py-3 text-sm font-bold rounded-xl border transition-all ${
                               la_dang_chon
                                 ? "bg-primary border-primary text-primary-foreground shadow-md"
-                                : hop_le
-                                  ? "border-gray-200 text-gray-600 hover:border-primary bg-white"
+                                : !bi_khoa
+                                  ? "border-gray-200 text-gray-600 hover:border-primary bg-white text-gray-700 font-bold"
                                   : "bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed"
                             }`}
                           >
@@ -265,20 +398,18 @@ export default function BookingStep1() {
                         );
                       })}
                     </div>
-
-                    {/* Legend */}
                     <div className="flex flex-wrap gap-6 mt-6">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-primary"></div>
-                        <span className="text-xs font-medium text-gray-500 tracking-tight">Đã chọn</span>
+                        <div className="w-3 h-3 rounded-full bg-primary shadow-sm" />
+                        <span className="text-xs font-medium text-gray-500">Đã chọn</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full border border-gray-300"></div>
-                        <span className="text-xs font-medium text-gray-500 tracking-tight">Còn trống</span>
+                        <div className="w-3 h-3 rounded-full border border-gray-300 bg-white" />
+                        <span className="text-xs font-medium text-gray-500">Còn trống</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-200"></div>
-                        <span className="text-xs font-medium text-gray-500 tracking-tight">Đã đặt</span>
+                        <div className="w-3 h-3 rounded-full bg-gray-200 border border-gray-200" />
+                        <span className="text-xs font-medium text-gray-500">Đã đặt</span>
                       </div>
                     </div>
                   </div>
@@ -293,15 +424,12 @@ export default function BookingStep1() {
                   <div>
                     <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Dịch vụ</p>
                     <p className="font-bold text-gray-800 text-sm leading-tight">{dich_vu_da_chon?.ten}</p>
-                    <p className="text-primary font-bold text-sm mt-1">{Number(dich_vu_da_chon?.gia).toLocaleString()}đ</p>
+                    <p className="text-primary font-bold text-sm mt-1">{dich_vu_da_chon?.gia.toLocaleString()}đ</p>
                   </div>
-
                   <div>
                     <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Chuyên viên</p>
                     <p className="font-bold text-gray-800 text-sm leading-tight">{ktv_da_chon?.ten}</p>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase mt-1 tracking-tighter">{ktv_da_chon?.vai_tro}</p>
                   </div>
-
                   <div>
                     <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Thời gian</p>
                     {ngay_da_chon && gio_da_chon ? (
@@ -315,27 +443,19 @@ export default function BookingStep1() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center w-full mt-10">
-            <div className="flex justify-between items-center w-full pt-6 border-t border-gray-100">
-              <button
-                onClick={() => setBuocHienTai(1)}
-                className="px-6 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-              >
-                Quay lại
-              </button>
-              <button
-                disabled={!ngay_da_chon || !gio_da_chon || dang_gui}
-                onClick={xửLýChốtLịch}
-                className="px-8 py-3 bg-primary text-primary-foreground rounded-lg font-bold hover:opacity-90 transition-all shadow-md active:scale-95 disabled:opacity-50"
-              >
-                {dang_gui ? "Đang xử lý..." : "Xác nhận lịch"}
-              </button>
-            </div>
+          <div className="flex justify-between items-center w-full mt-10 pt-6 border-t border-gray-100">
             <button
               onClick={() => setBuocHienTai(1)}
-              className="mt-4 text-gray-400 hover:text-primary text-sm underline transition-colors"
+              className="px-6 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 font-medium transition-colors"
             >
-              Trở về bước 1
+              Quay lại
+            </button>
+            <button
+              disabled={!ngay_da_chon || !gio_da_chon || dang_gui}
+              onClick={xửLýChốtLịch}
+              className="px-12 py-3 bg-primary text-primary-foreground rounded-lg font-bold hover:opacity-90 transition-all shadow-md active:scale-95 disabled:opacity-50"
+            >
+              {dang_gui ? "Đang xử lý..." : "Xác nhận lịch"}
             </button>
           </div>
         </div>
