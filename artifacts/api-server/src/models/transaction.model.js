@@ -22,7 +22,9 @@ class Transaction {
     // Dữ liệu đối soát OCR
     this.ocrData = {
       detectedAmount: ocrData.detectedAmount,
-      detectedContent: ocrData.detectedContent
+      detectedContent: ocrData.detectedContent,
+      detectedRecipient: ocrData.detectedRecipient,
+      detectedTransferDate: ocrData.detectedTransferDate
     };
   }
 

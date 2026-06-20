@@ -23,6 +23,8 @@ export default function Payment() {
   const [ocrResult, setOcrResult] = useState<{
     detectedAmount: number | null;
     detectedContent: string | null;
+    detectedRecipient: string | null;
+    detectedTransferDate: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -95,6 +97,8 @@ export default function Payment() {
       setOcrResult({
         detectedAmount: data.data.detectedAmount,
         detectedContent: data.data.detectedContent,
+        detectedRecipient: data.data.detectedRecipient,
+        detectedTransferDate: data.data.detectedTransferDate,
       });
 
       if (data.data.ocrStatus === "failed") {
@@ -219,8 +223,16 @@ export default function Payment() {
                     </span>
                   </div>
                   <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Người nhận:</span>
+                    <span className="font-medium text-right">{ocrResult.detectedRecipient || "Không đọc được"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground shrink-0">Nội dung nhận diện:</span>
                     <span className="font-medium text-right">{ocrResult.detectedContent || "Không đọc được"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Thời gian chuyển khoản:</span>
+                    <span className="font-medium text-right">{ocrResult.detectedTransferDate || "Không đọc được"}</span>
                   </div>
                 </div>
               )}

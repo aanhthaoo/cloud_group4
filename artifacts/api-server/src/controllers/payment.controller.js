@@ -68,17 +68,34 @@ async function verifyReceipt(req, res) {
     // 3. OCR bằng Cloud Vision
     let detectedText = '';
     let ocrStatus = 'processing';
+    let ocrErrorDetail = null;
     try {
       const [result] = await visionClient.textDetection({ image: { content: imageBuffer } });
       detectedText = result.fullTextAnnotation ? result.fullTextAnnotation.text : '';
       ocrStatus = detectedText ? 'verified' : 'failed';
+      if (!detectedText) {
+        // Vision trả về thành công nhưng không tìm thấy chữ nào trong ảnh
+        // (ảnh mờ/rỗng) — phân biệt với trường hợp gọi API bị lỗi bên dưới.
+        ocrErrorDetail = 'Vision API không phát hiện được văn bản nào trong ảnh.';
+      }
     } catch (err) {
-      console.error('Lỗi gọi Cloud Vision API:', err);
+      // Log đầy đủ lỗi gốc (code, message, details) ra server console — đây là
+      // chỗ quan trọng nhất để debug khi Vision API chưa được Enable / project
+      // chưa gắn billing / service account thiếu quyền. Lỗi GCP thường có dạng
+      // "7 PERMISSION_DENIED: ..." hoặc "API has not been used... before or it
+      // is disabled".
+      console.error('❌ Lỗi gọi Cloud Vision API:', {
+        code: err.code,
+        message: err.message,
+        details: err.details,
+      });
       ocrStatus = 'failed';
+      ocrErrorDetail = err.message;
     }
 
-    // 4. Bóc tách số tiền + nội dung
-    const { detectedAmount, detectedContent } = parseReceiptText(detectedText);
+    // 4. Bóc tách số tiền + nội dung + người nhận + thời gian
+    const { detectedAmount, detectedContent, detectedRecipient, detectedTransferDate } =
+      parseReceiptText(detectedText);
 
     // 5. Lưu lại Transaction để đối soát
     const transaction = new Transaction({
@@ -88,7 +105,7 @@ async function verifyReceipt(req, res) {
       amountPaid,
       receiptImageUrl: fileName,
       ocrStatus,
-      ocrData: { detectedAmount, detectedContent },
+      ocrData: { detectedAmount, detectedContent, detectedRecipient, detectedTransferDate },
     });
 
     await db.collection('transactions').doc(transaction.transactionId).set(transaction.toFirestore());
@@ -102,7 +119,12 @@ async function verifyReceipt(req, res) {
         ocrStatus,
         detectedAmount,
         detectedContent,
+        detectedRecipient,
+        detectedTransferDate,
         rawText: detectedText,
+        // Chỉ trả lý do lỗi chi tiết khi KHÔNG phải production, để tránh lộ
+        // thông tin nội bộ (mã lỗi GCP, account...) ra client thật.
+        ...(process.env.NODE_ENV !== 'production' && ocrErrorDetail ? { ocrErrorDetail } : {}),
         // Cờ tiện cho FE: số tiền OCR đọc được có khớp với số tiền cần thanh toán không
         amountMatches:
           typeof amountPaid === 'number' && detectedAmount !== null
