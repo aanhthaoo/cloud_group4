@@ -6,8 +6,7 @@ export default function Booking() {
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-12 text-center">
-          <h1 className="text-4xl font-serif font-bold text-gray-900 tracking-tight">Đặt Lịch Hẹn</h1>
-          <div className="h-1 w-20 bg-pink-400 mx-auto rounded-full mt-4" />
+          <h1 className="text-3xl font-serif font-bold text-gray-900 tracking-tight">Đặt Lịch Hẹn</h1>
         </div>
 
         <div className="space-y-6">

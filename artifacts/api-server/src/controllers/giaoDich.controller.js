@@ -1,51 +1,10 @@
 const axios = require('axios');
 require('dotenv').config();
 
-// Hàm xử lý giữ chỗ tạm thời và tạo mã QR thanh toán
-const giuChoVaTaoQR = async (req, res) => {
-  try {
-    const { thong_tin_khach, ten_dich_vu, ten_ky_thuat_vien } = req.body;
-    const ma_don_hang = `SPA-${Date.now()}`;
-    const so_tien_coc = 300000;
-
-    const url_bitrix = process.env.BITRIX24_WEBHOOK_URL + "crm.deal.add";
-    await axios.post(url_bitrix, {
-      fields: {
-        TITLE: `Đặt lịch: ${ten_dich_vu} - ${thong_tin_khach}`,
-        OPPORTUNITY: so_tien_coc,
-        CURRENCY_ID: "VND",
-        STAGE_ID: "NEW",
-        COMMENTS: `Khách hàng: ${thong_tin_khach}, Dịch vụ: ${ten_dich_vu}, Kỹ thuật viên: ${ten_ky_thuat_vien}, Mã đơn: ${ma_don_hang}`
-      }
-    });
-
-    const payload_vietqr = {
-      accountNo: process.env.VIETQR_ACCOUNT_NO,
-      accountName: process.env.VIETQR_ACCOUNT_NAME,
-      acqId: process.env.VIETQR_ACQ_ID,
-      amount: so_tien_coc,
-      addInfo: ma_don_hang,
-      template: "compact"
-    };
-
-    const response_vietqr = await axios.post("https://api.vietqr.io/v2/generate", payload_vietqr);
-    const link_anh_qr = response_vietqr.data?.data?.qrDataURL || response_vietqr.data?.data?.qrCode;
-
-    return res.status(200).json({
-      thong_bao: "Giữ chỗ tạm thời thành công.",
-      ma_don_hang: ma_don_hang,
-      link_anh_qr: link_anh_qr
-    });
-  } catch (error) {
-    return res.status(500).json({ thong_bao: "Lỗi xử lý.", error: error.message });
-  }
-};
-
-// Hàm lấy dữ liệu dịch vụ và nhân viên động từ Bitrix24 - KHỚP LỆNH SẢN PHẨM & KTV
+// 1. API GET: Lấy thông tin dịch vụ và KTV động từ Bitrix24
 const layThongTinDatLich = async (req, res) => {
   try {
     const url_goc = "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/";
-
     const [phan_hoi_dat_lich, phan_hoi_san_pham] = await Promise.all([
         axios.get(url_goc + "crm.deal.fields"),
         axios.get(url_goc + "crm.product.list")
@@ -61,7 +20,6 @@ const layThongTinDatLich = async (req, res) => {
     const mang_ktv_bitrix = cai_dat.SELECTED_RESOURCES || [];
     const kho_san_pham = phan_hoi_san_pham.data.result || [];
 
-    // Danh sách Icon chuẩn Lucide
     const tu_dien_icon = {
         "Massage thư giãn": "Flower2",
         "Chăm sóc da mặt": "Sparkles",
@@ -73,18 +31,17 @@ const layThongTinDatLich = async (req, res) => {
     const danh_sach_dich_vu = mang_dich_vu_bitrix.map((dv, vi_tri) => {
         const ten_dv = dv.name.trim();
         const san_pham_khop = kho_san_pham.find(sp => sp.NAME.trim() === ten_dv);
-
+        const mo_ta_goc = san_pham_khop ? san_pham_khop.DESCRIPTION : "Trải nghiệm dịch vụ đẳng cấp";
         return {
             id: vi_tri + 1,
             ten: ten_dv,
             thoi_gian: dv.duration,
             gia: san_pham_khop ? san_pham_khop.PRICE : "0",
-            mo_ta: san_pham_khop ? san_pham_khop.DESCRIPTION : "Trải nghiệm dịch vụ đẳng cấp tại LotusGlow",
+            mo_ta: mo_ta_goc.replace(/&nbsp;/g, ' '),
             icon: tu_dien_icon[ten_dv] || "CheckCircle2"
         };
     });
 
-    // Từ điển thông tin bổ sung KTV
     const tu_dien_ktv = {
         "Thảo Anh": { vai_tro: "Massage chuyên sâu", danh_gia: "4.9" },
         "Ngọc Anh": { vai_tro: "Chăm sóc da liễu", danh_gia: "4.8" },
@@ -96,7 +53,6 @@ const layThongTinDatLich = async (req, res) => {
     const danh_sach_ktv = mang_ktv_bitrix.map(ktv => {
         const ten_ktv = (ktv.title || ktv.NAME).trim();
         const thong_tin_them = tu_dien_ktv[ten_ktv] || { vai_tro: "Chuyên viên Salon", danh_gia: "5.0" };
-
         return {
             id: ktv.id,
             ten: ten_ktv,
@@ -106,14 +62,60 @@ const layThongTinDatLich = async (req, res) => {
     });
 
     return res.status(200).json({ danh_sach_dich_vu, danh_sach_ktv });
-
   } catch (loi) {
     console.error("LỖI KHỚP LỆNH:", loi.message);
-    return res.status(500).json({ loi: "Lỗi hệ thống", chi_tiet: loi.message });
+    return res.status(500).json({ loi: "Lỗi hệ thống" });
   }
 };
 
+// 2. API POST: Chốt lịch hẹn và sinh mã VietQR
+const chotLichHen = async (req, res) => {
+    try {
+        const { ten_dich_vu, gia_tien, ten_ktv, ngay_dat, gio_dat, thoi_gian } = req.body;
+        const url_goc = "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/";
+
+        // XỬ LÝ GIÁ TIỀN CHUẨN: Ép về kiểu số nguyên, loại bỏ hoàn toàn phần thập phân dư thừa
+        const gia_tien_sach = gia_tien ? gia_tien.toString().replace(/[^0-9]/g, '') : "0";
+        const so_tien_sach = Math.round(parseFloat(gia_tien_sach));
+
+        const du_lieu_lich = {
+            "date_start": `${ngay_dat} ${gio_dat}:00`,
+            "duration": parseInt(thoi_gian) * 60,
+            "service_name": ten_dich_vu,
+            "resources": [{ "id": "1", "title": ten_ktv }]
+        };
+
+        const phan_hoi = await axios.post(url_goc + "crm.deal.add", {
+            fields: {
+                TITLE: `Booking - ${ten_dich_vu}`,
+                STAGE_ID: "NEW",
+                OPPORTUNITY: so_tien_sach,
+                CURRENCY_ID: "VND",
+                UF_CRM_1781780490460: JSON.stringify(du_lieu_lich)
+            }
+        });
+
+        const id_giao_dich = phan_hoi.data.result;
+
+        const ma_ngan_hang = process.env.NGAN_HANG || "MB";
+        const so_tai_khoan = process.env.SO_TAI_KHOAN || "0377172930";
+        const ten_tai_khoan = encodeURIComponent(process.env.TEN_TAI_KHOAN || "SPA LOTUSGLOW");
+
+        const link_qr_dong = `https://img.vietqr.io/image/${ma_ngan_hang}-${so_tai_khoan}-print.png?amount=${so_tien_sach}&addInfo=LOTUSGLOW DH${id_giao_dich}&accountName=${ten_tai_khoan}`;
+
+        return res.status(200).json({ thanh_cong: true, id_giao_dich, link_qr: link_qr_dong });
+    } catch (loi) {
+        console.error("LỖI CHỐT LỊCH HẸN:", loi.message);
+        return res.status(500).json({ loi: "Lỗi hệ thống" });
+    }
+};
+
+const giuChoVaTaoQR = async (req, res) => {
+  return res.status(404).json({ thong_bao: "Vui lòng sử dụng /api/chot-lich-hen" });
+};
+
 module.exports = {
-  giuChoVaTaoQR,
-  layThongTinDatLich
+    layThongTinDatLich,
+    chotLichHen,
+    giuChoVaTaoQR
 };
