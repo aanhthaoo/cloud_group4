@@ -21,10 +21,12 @@ export default function Payment() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [ocrResult, setOcrResult] = useState<{
+    ocrStatus: string;
     detectedAmount: number | null;
     detectedContent: string | null;
     detectedRecipient: string | null;
     detectedTransferDate: string | null;
+    ocrErrorDetail?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -83,7 +85,9 @@ export default function Payment() {
 
   // 2. Sau khi có file trên R2 + captcha hợp lệ -> gọi backend để OCR biên lai
   //    bằng Google Cloud Vision và xác thực reCAPTCHA token.
-  const handleConfirm = async () => {
+  //    QUAN TRỌNG: không setLocation ở đây — chỉ hiển thị kết quả, khách tự
+  //    bấm xác nhận lần 2 (handleFinalize) mới thực sự chuyển trang.
+  const handleConfirm = useCallback(async () => {
     if (!uploadedFileName || !captchaToken) return;
 
     setIsVerifying(true);
@@ -95,27 +99,45 @@ export default function Payment() {
       });
 
       setOcrResult({
+        ocrStatus: data.data.ocrStatus,
         detectedAmount: data.data.detectedAmount,
         detectedContent: data.data.detectedContent,
         detectedRecipient: data.data.detectedRecipient,
         detectedTransferDate: data.data.detectedTransferDate,
+        ocrErrorDetail: data.data.ocrErrorDetail,
       });
 
       if (data.data.ocrStatus === "failed") {
-        toast.error("Không đọc được nội dung biên lai. Vui lòng kiểm tra lại ảnh.");
+        toast.error("Không đọc được nội dung biên lai. Xem chi tiết lỗi bên dưới.");
         return;
       }
 
-      toast.success("Đã xác thực biên lai!");
-      setLocation("/booking-status");
+      toast.success("Đã đọc được thông tin biên lai. Kiểm tra lại bên dưới rồi xác nhận.");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Xác thực biên lai thất bại");
     } finally {
       setIsVerifying(false);
     }
+  }, [uploadedFileName, captchaToken]);
+
+  // Tự động chạy OCR ngay khi đủ 2 điều kiện: đã upload xong ảnh lên R2 VÀ đã
+  // tick reCAPTCHA — không cần khách bấm nút gì cả. Dù khách làm trước/sau
+  // (upload trước rồi tick captcha, hay tick captcha trước rồi upload) thì
+  // cái nào xong SAU sẽ tự kích hoạt OCR ngay lúc đó.
+  useEffect(() => {
+    if (uploadedFileName && captchaToken && !ocrResult && !isVerifying) {
+      handleConfirm();
+    }
+  }, [uploadedFileName, captchaToken, ocrResult, isVerifying, handleConfirm]);
+
+  // 3. Khách xem kết quả OCR thấy đúng -> bấm xác nhận lần 2 mới thực sự
+  //    chuyển sang trang trạng thái đặt lịch (transaction đã lưu ở bước trên rồi).
+  const handleFinalize = () => {
+    setLocation("/booking-status");
   };
 
-  const canConfirm = !!uploadedFileName && !!captchaToken && !expired && !isUploading && !isVerifying;
+  const hasVerifiedOcr = !!ocrResult && ocrResult.ocrStatus !== "failed";
+  const ocrFailed = !!ocrResult && ocrResult.ocrStatus === "failed";
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
@@ -213,7 +235,20 @@ export default function Payment() {
                 )}
               </label>
 
-              {ocrResult && (
+              {ocrResult && ocrResult.ocrStatus === "failed" && (
+                <div className="mt-4 text-sm bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
+                  <p className="font-medium text-red-700 flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4 shrink-0" /> OCR đọc ảnh thất bại
+                  </p>
+                  <p className="text-red-600">
+                    {ocrResult.ocrErrorDetail
+                      ? `Lý do: ${ocrResult.ocrErrorDetail}`
+                      : "Không rõ lý do — xem cửa sổ terminal đang chạy backend (pnpm run dev) để biết chi tiết."}
+                  </p>
+                </div>
+              )}
+
+              {ocrResult && ocrResult.ocrStatus !== "failed" && (
                 <div className="mt-4 text-sm bg-slate-50 rounded-lg p-3 space-y-1">
                   <p className="font-medium text-foreground">Kết quả OCR (tự động đọc từ ảnh):</p>
                   <div className="flex justify-between">
@@ -246,10 +281,26 @@ export default function Payment() {
               className="w-full h-14 text-lg font-medium shadow-md"
               size="lg"
               data-testid="button-confirm-payment"
-              disabled={!canConfirm}
-              onClick={handleConfirm}
+              disabled={
+                hasVerifiedOcr
+                  ? false
+                  : ocrFailed
+                  ? isVerifying
+                  : true // chưa có kết quả OCR (đang chờ upload/captcha/verifying) -> chưa cho bấm, vì nó tự chạy
+              }
+              onClick={hasVerifiedOcr ? handleFinalize : ocrFailed ? handleConfirm : undefined}
             >
-              {isVerifying ? "Đang xác thực biên lai..." : "Xác nhận chốt lịch"}
+              {isVerifying
+                ? "Đang đọc thông tin biên lai..."
+                : hasVerifiedOcr
+                ? "Xác nhận thông tin & Chốt lịch"
+                : ocrFailed
+                ? "Thử đọc lại biên lai"
+                : !uploadedFileName
+                ? "Vui lòng tải ảnh biên lai lên"
+                : !captchaToken
+                ? "Vui lòng xác thực reCAPTCHA"
+                : "Đang xử lý..."}
             </Button>
 
             {expired && (
