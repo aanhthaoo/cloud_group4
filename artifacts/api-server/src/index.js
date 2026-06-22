@@ -12,7 +12,7 @@ app.use(express.json());
 
 // Import các routes API
 const indexRoutes = require('./routes/index.routes.js');
-app.use('/', indexRoutes);
+app.use('/api', indexRoutes);
 
 // Route gốc
 app.get('/', (req, res) => {
