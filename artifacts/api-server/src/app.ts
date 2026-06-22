@@ -25,7 +25,16 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "https://app.lotusgrow.guardcourse.me",
+      "http://localhost:5173",
+      "http://localhost:4173",
+    ],
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

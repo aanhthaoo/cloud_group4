@@ -3,12 +3,16 @@ const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { s3Client } = require('../config/r2');
 const authRoutes = require('./auth.routes');
+const chatRoutes = require('./chat.routes');
 
 const router = express.Router();
 
-router.use('/api/auth', authRoutes);
+// app.ts đã mount router này tại /api rồi
+// nên TẤT CẢ path ở đây KHÔNG được thêm /api nữa
+router.use('/auth', authRoutes);
+router.use('/', chatRoutes);
 
-router.get('/api/availability', (req, res) => {
+router.get('/availability', (req, res) => {
   // TODO: Tích hợp logic lấy dữ liệu availability thực tế
   res.status(200).json({
     message: 'Availability data',
@@ -16,7 +20,7 @@ router.get('/api/availability', (req, res) => {
   });
 });
 
-router.post('/api/bookings', (req, res) => {
+router.post('/bookings', (req, res) => {
   // TODO: Tích hợp logic tạo booking thực tế
   res.status(501).json({
     message: 'Chức năng tạo booking chưa được implement'
@@ -24,7 +28,7 @@ router.post('/api/bookings', (req, res) => {
 });
 
 // Route lấy Presigned URL để upload file lên R2
-router.get('/api/upload-url/receipt', async (req, res) => {
+router.get('/upload-url/receipt', async (req, res) => {
     try {
         // Tạo một tên file ngẫu nhiên để không bị trùng
         const fileName = `receipt_${Date.now()}.jpg`;
