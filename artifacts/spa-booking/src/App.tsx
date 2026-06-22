@@ -7,7 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Booking from "@/pages/booking";
-import Payment from "@/pages/payment";
+
 import Membership from "@/pages/membership";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -45,9 +45,7 @@ function Router() {
       <Route path="/booking">
         {() => <AuthGuard><Booking /></AuthGuard>}
       </Route>
-      <Route path="/payment">
-        {() => <AuthGuard><Payment /></AuthGuard>}
-      </Route>
+
       <Route path="/membership">
         {() => <AuthGuard><Membership /></AuthGuard>}
       </Route>

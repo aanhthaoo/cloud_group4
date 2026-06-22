@@ -1,11 +1,16 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import * as ThuVienIcon from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import api from "@/lib/axios";
+import Recaptcha from "@/components/Recaptcha";
+
+
 
 export default function BookingStep1() {
-  // 1. Quản lý trạng thái (State) 100% Tiếng Việt
+  // ─── 1. State chọn lịch ───────────────────────────────────────────────
   const [danh_sach_dich_vu, setDanhSachDichVu] = useState<any[]>([]);
   const [danh_sach_ktv, setDanhSachKtv] = useState<any[]>([]);
   const [danh_sach_lich_ban, setDanhSachLichBan] = useState<string[]>([]);
@@ -22,13 +27,28 @@ export default function BookingStep1() {
   const [dang_gui, setDangGui] = useState(false);
   const [hien_thong_bao_thanh_cong, setHienThongBaoThanhCong] = useState(false);
 
-  // --- TRẠNG THÁI MỚI CHO THANH TOÁN ĐẶC CỌC ---
-  const [file_bien_lai, setFileBienLai] = useState<File | null>(null);
-  const [da_xac_thuc_bot, setDaXacThucBot] = useState(false);
-  const vungChonFile = useRef<HTMLInputElement>(null);
+
+
+  // ─── 3. State thanh toán — upload R2 + OCR ───────────────────────────
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [ocrResult, setOcrResult] = useState<{
+    ocrStatus: string;
+    detectedAmount: number | null;
+    detectedContent: string | null;
+    detectedRecipient: string | null;
+    detectedTransferDate: string | null;
+    ocrErrorDetail?: string;
+  } | null>(null);
+  // Ref chặn useEffect trigger OCR nhiều lần (ví dụ: captchaToken hết hạn giữa chừng)
+  const hasTriggeredOcr = useRef(false);
 
   const mang_khung_gio = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30"];
 
+  // ─── Load dữ liệu ban đầu ────────────────────────────────────────────
   useEffect(() => {
     const taiDuLieu = async () => {
       try {
@@ -45,6 +65,7 @@ export default function BookingStep1() {
     taiDuLieu();
   }, []);
 
+  // ─── Validate giờ hợp lệ ─────────────────────────────────────────────
   const kiemTraGioHopLe = (gio: string, ngay_da_chon_param: string) => {
     const hien_tai = new Date();
     const ngay_chon = new Date(ngay_da_chon_param);
@@ -56,7 +77,6 @@ export default function BookingStep1() {
 
     if (gio_hen < gio_hien_tai) return false;
     if (gio_hen === gio_hien_tai && phut_hen <= phut_hien_tai) return false;
-
     return true;
   };
 
@@ -66,6 +86,9 @@ export default function BookingStep1() {
     }
   }, [ngay_da_chon]);
 
+
+
+  // ─── Chốt lịch ───────────────────────────────────────────────────────
   const xửLýChốtLịch = async () => {
     setDangGui(true);
     try {
@@ -84,12 +107,99 @@ export default function BookingStep1() {
       }
     } catch (loi) {
       console.error("Lỗi chốt lịch:", loi);
-      alert("Không thể chốt lịch hẹn. Vui lòng thử lại!");
+      toast.error("Không thể chốt lịch hẹn. Vui lòng thử lại!");
     } finally {
       setDangGui(false);
     }
   };
 
+  // ─── Upload biên lai lên Cloudflare R2 qua presigned URL ─────────────
+  const uploadReceiptToR2 = useCallback(async (selectedFile: File) => {
+    setIsUploading(true);
+    setUploadedFileName(null);
+    setOcrResult(null);
+    hasTriggeredOcr.current = false; // reset khi upload ảnh mới
+
+    try {
+      const { data } = await api.get("/api/upload-url/receipt");
+      const { uploadUrl, fileName } = data;
+
+      const putResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "image/jpeg" },
+        body: selectedFile,
+      });
+
+      if (!putResponse.ok) {
+        throw new Error("Upload lên R2 thất bại");
+      }
+
+      setUploadedFileName(fileName);
+      toast.success("Đã tải biên lai lên thành công");
+    } catch (err: any) {
+      toast.error(err.message || "Không thể tải biên lai lên. Vui lòng thử lại.");
+      setFile(null);
+    } finally {
+      setIsUploading(false);
+    }
+  }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selected = e.target.files[0];
+      setFile(selected);
+      uploadReceiptToR2(selected);
+    }
+  };
+
+  // ─── Gọi OCR sau khi đủ điều kiện: đã upload R2 + có captchaToken ────
+  // Tự động kích hoạt: dù upload trước hay tick captcha trước, cái xong sau sẽ trigger.
+  const handleConfirm = useCallback(async () => {
+    if (!uploadedFileName || !captchaToken || !dich_vu_da_chon) return;
+
+    const tien_coc = Math.round(Number(dich_vu_da_chon.gia) * 0.3);
+
+    setIsVerifying(true);
+    try {
+      const { data } = await api.post("/api/payments/verify-receipt", {
+        fileName: uploadedFileName,
+        recaptchaToken: captchaToken,
+        amountPaid: tien_coc,
+      });
+
+      setOcrResult({
+        ocrStatus: data.data.ocrStatus,
+        detectedAmount: data.data.detectedAmount,
+        detectedContent: data.data.detectedContent,
+        detectedRecipient: data.data.detectedRecipient,
+        detectedTransferDate: data.data.detectedTransferDate,
+        ocrErrorDetail: data.data.ocrErrorDetail,
+      });
+
+      if (data.data.ocrStatus === "failed") {
+        toast.error("Không đọc được nội dung biên lai. Xem chi tiết lỗi bên dưới.");
+        return;
+      }
+
+      toast.success("Đã đọc được thông tin biên lai. Kiểm tra lại bên dưới rồi xác nhận.");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Xác thực biên lai thất bại");
+    } finally {
+      setIsVerifying(false);
+    }
+  }, [uploadedFileName, captchaToken, dich_vu_da_chon]);
+
+  // OCR tự động chạy ngay khi đủ 2 điều kiện, chỉ trigger 1 lần dựa trên ref.
+  // Tránh lỗi vòng lặp khi captchaToken hết hạn giữa lúc OCR đang xử lý.
+  useEffect(() => {
+    if (uploadedFileName && captchaToken && !hasTriggeredOcr.current) {
+      hasTriggeredOcr.current = true;
+      handleConfirm();
+    }
+  }, [uploadedFileName, captchaToken, handleConfirm]);
+
+
+  // ─── Xác nhận cuối — hiển thị popup thành công ───────────────────────
   const xuLyXacNhanThanhToan = async () => {
     try {
       if (ma_giao_dich) {
@@ -98,13 +208,21 @@ export default function BookingStep1() {
       setHienThongBaoThanhCong(true);
     } catch (loi) {
       console.error("Lỗi khi xác nhận thanh toán:", loi);
-      alert("Có lỗi xảy ra khi xác nhận hệ thống. Vui lòng thử lại.");
+      toast.error("Có lỗi xảy ra khi xác nhận hệ thống. Vui lòng thử lại.");
     }
   };
 
-  if (dang_tai) return <div className="p-10 text-center text-primary animate-pulse font-bold text-lg font-serif">Đang kết nối Salon...</div>;
+  const hasVerifiedOcr = !!ocrResult && ocrResult.ocrStatus !== "failed";
+  const ocrFailed = !!ocrResult && ocrResult.ocrStatus === "failed";
 
-  // --- GIAO DIỆN THANH TOÁN ĐẶT CỌC (Khi đã có mã giao dịch) ---
+  // ─── Loading ──────────────────────────────────────────────────────────
+  if (dang_tai) return (
+    <div className="p-10 text-center text-primary animate-pulse font-bold text-lg font-serif">
+      Đang kết nối Salon...
+    </div>
+  );
+
+  // ─── MÀNN HÌNH THANH TOÁN ĐẶT CỌC (khi đã có mã giao dịch) ─────────
   if (ma_giao_dich) {
     const tong_cong = Number(dich_vu_da_chon.gia);
     const tien_coc = Math.round(tong_cong * 0.3);
@@ -112,9 +230,8 @@ export default function BookingStep1() {
 
     return (
       <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
-        <h2 className="text-3xl font-serif font-bold text-center text-gray-800 mb-6">Thanh toán đặt cọc</h2>
 
-        <div className="grid md:grid-cols-2 gap-8 mt-8">
+        <div className="grid md:grid-cols-2 gap-8">
           {/* CỘT TRÁI: HÓA ĐƠN & NGÂN HÀNG */}
           <div className="space-y-6">
             <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
@@ -130,7 +247,9 @@ export default function BookingStep1() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Ngày & Giờ:</span>
-                  <span className="font-bold text-gray-800">{gio_da_chon} • {new Date(ngay_da_chon).toLocaleDateString('vi-VN')}</span>
+                  <span className="font-bold text-gray-800">
+                    {gio_da_chon} • {new Date(ngay_da_chon).toLocaleDateString('vi-VN')}
+                  </span>
                 </div>
                 <div className="pt-3 border-t border-dashed flex justify-between">
                   <span className="text-gray-600 font-bold">Tổng cộng:</span>
@@ -166,95 +285,154 @@ export default function BookingStep1() {
             </div>
           </div>
 
-          {/* CỘT PHẢI: UPLOAD & XÁC NHẬN */}
+          {/* CỘT PHẢI: UPLOAD BIÊN LAI + reCAPTCHA + XÁC NHẬN */}
           <div className="space-y-6">
             <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
               <h3 className="text-lg font-bold text-gray-800">Tải lên biên lai</h3>
               <p className="text-xs text-gray-500">Vui lòng tải lên ảnh chụp màn hình chuyển khoản thành công.</p>
 
-              <input
-                type="file"
-                ref={vungChonFile}
-                onChange={(e) => setFileBienLai(e.target.files?.[0] || null)}
-                accept="image/*"
-                className="hidden"
-              />
-              <div
-                onClick={() => vungChonFile.current?.click()}
-                className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl flex flex-col items-center justify-center p-12 cursor-pointer hover:bg-primary/10 transition-all group"
-              >
-                <ThuVienIcon.UploadCloud className="w-10 h-10 text-primary/60 mb-3 group-hover:scale-110 transition-transform" />
-                {file_bien_lai ? (
-                  <p className="text-sm font-bold text-primary truncate max-w-full">{file_bien_lai.name}</p>
+              <label className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl flex flex-col items-center justify-center p-12 cursor-pointer hover:bg-primary/10 transition-all group">
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  data-testid="input-receipt-upload"
+                  disabled={isUploading}
+                />
+                {isUploading ? (
+                  <div className="flex flex-col items-center text-center">
+                    <ThuVienIcon.Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
+                    <span className="text-sm font-medium text-foreground">Đang tải lên...</span>
+                  </div>
+                ) : file && uploadedFileName ? (
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-3">
+                      <ThuVienIcon.Check className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-bold text-primary truncate max-w-full">{file.name}</p>
+                    <span className="text-xs text-muted-foreground mt-1">Nhấn để tải lại ảnh khác</span>
+                  </div>
                 ) : (
                   <div className="text-center">
+                    <ThuVienIcon.UploadCloud className="w-10 h-10 text-primary/60 mb-3 mx-auto group-hover:scale-110 transition-transform" />
                     <p className="text-sm font-medium text-primary">Kéo thả hoặc Nhấn để tải ảnh lên</p>
                     <p className="text-[10px] text-gray-400 mt-1">PNG, JPG tối đa 5MB</p>
                   </div>
                 )}
-              </div>
-            </div>
+              </label>
 
-            {/* reCAPTCHA Mock UI */}
-            <div className="border border-gray-200 rounded-xl p-4 bg-white flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3">
-                <div
-                  onClick={() => setDaXacThucBot(!da_xac_thuc_bot)}
-                  className={`w-6 h-6 border-2 rounded flex items-center justify-center cursor-pointer transition-colors ${da_xac_thuc_bot ? "bg-green-500 border-green-500" : "border-gray-300"}`}
-                >
-                  {da_xac_thuc_bot && <ThuVienIcon.Check className="w-4 h-4 text-white" />}
+              {/* Kết quả OCR — thất bại */}
+              {ocrFailed && (
+                <div className="text-sm bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
+                  <p className="font-medium text-red-700 flex items-center gap-1">
+                    <ThuVienIcon.AlertTriangle className="w-4 h-4 shrink-0" /> OCR đọc ảnh thất bại
+                  </p>
+                  <p className="text-red-600">
+                    {ocrResult?.ocrErrorDetail
+                      ? `Lý do: ${ocrResult.ocrErrorDetail}`
+                      : "Không rõ lý do — xem terminal backend để biết chi tiết."}
+                  </p>
                 </div>
-                <span className="text-sm font-medium text-gray-600">Tôi không phải robot</span>
-              </div>
-              <ThuVienIcon.ShieldCheck className="w-6 h-6 text-blue-500 opacity-30" />
+              )}
+
+              {/* Kết quả OCR — thành công */}
+              {hasVerifiedOcr && ocrResult && (
+                <div className="text-sm bg-slate-50 rounded-lg p-3 space-y-1">
+                  <p className="font-medium text-foreground">Kết quả OCR (tự động đọc từ ảnh):</p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Số tiền nhận diện:</span>
+                    <span className="font-medium">
+                      {ocrResult.detectedAmount
+                        ? `${ocrResult.detectedAmount.toLocaleString("vi-VN")}đ`
+                        : "Không đọc được"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Người nhận:</span>
+                    <span className="font-medium text-right">{ocrResult.detectedRecipient || "Không đọc được"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Nội dung nhận diện:</span>
+                    <span className="font-medium text-right">{ocrResult.detectedContent || "Không đọc được"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Thời gian chuyển khoản:</span>
+                    <span className="font-medium text-right">{ocrResult.detectedTransferDate || "Không đọc được"}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <button
-              disabled={!file_bien_lai || !da_xac_thuc_bot}
-              onClick={xuLyXacNhanThanhToan}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-md active:scale-95 ${
-                (file_bien_lai && da_xac_thuc_bot)
-                  ? "bg-primary text-white hover:opacity-90"
-                  : "bg-primary/20 text-primary/60 cursor-not-allowed"
-              }`}
+            {/* reCAPTCHA thật */}
+            <div>
+              <Recaptcha onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+            </div>
+
+            {/* Nút xác nhận */}
+            <Button
+              className="w-full h-14 text-lg font-medium shadow-md"
+              size="lg"
+              data-testid="button-confirm-payment"
+              disabled={
+                hasVerifiedOcr
+                  ? false
+                  : ocrFailed
+                    ? isVerifying
+                    : true
+              }
+              onClick={
+                hasVerifiedOcr
+                  ? xuLyXacNhanThanhToan
+                  : ocrFailed
+                    ? handleConfirm
+                    : undefined
+              }
             >
-              Xác nhận chốt lịch
-            </button>
+              {isVerifying
+                ? "Đang đọc thông tin biên lai..."
+                : hasVerifiedOcr
+                  ? "Xác nhận thông tin & Chốt lịch"
+                  : ocrFailed
+                    ? "Thử đọc lại biên lai"
+                    : !uploadedFileName
+                      ? "Vui lòng tải ảnh biên lai lên"
+                      : !captchaToken
+                        ? "Vui lòng xác thực reCAPTCHA"
+                        : "Đang xử lý..."}
+            </Button>
+
+
           </div>
         </div>
 
+        {/* Popup thành công */}
         {hien_thong_bao_thanh_cong && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
-                <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl transform transition-all scale-100">
-                    {/* Icon Checkmark Vòng tròn hồng */}
-                    <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                        <svg className="w-10 h-10 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    </div>
-
-                    {/* Nội dung thông báo */}
-                    <h3 className="text-2xl font-bold text-gray-800 mb-3 font-serif">
-                        Đã nhận biên lai!
-                    </h3>
-                    <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-                        Cảm ơn bạn! LotusGlow đang tiến hành đối soát giao dịch bằng AI. Chúng tôi sẽ gửi thông báo xác nhận lịch hẹn trong giây lát.
-                    </p>
-
-                    {/* Nút hành động */}
-                    <button
-                        onClick={() => window.location.href = '/'}
-                        className="w-full bg-pink-300 text-white rounded-xl py-3.5 font-bold hover:bg-pink-400 transition-colors shadow-sm"
-                    >
-                        Về trang chủ
-                    </button>
-                </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
+            <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl transform transition-all scale-100">
+              <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                <svg className="w-10 h-10 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-3 font-serif">Đã nhận biên lai!</h3>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                Cảm ơn bạn! LotusGlow đang tiến hành đối soát giao dịch bằng AI. Chúng tôi sẽ gửi thông báo xác nhận lịch hẹn trong giây lát.
+              </p>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="w-full bg-pink-300 text-white rounded-xl py-3.5 font-bold hover:bg-pink-400 transition-colors shadow-sm"
+              >
+                Về trang chủ
+              </button>
             </div>
+          </div>
         )}
       </div>
     );
   }
 
+  // ─── LUỒNG CHỌN LỊCH (Bước 1 & 2) ───────────────────────────────────
   return (
     <div className="border border-gray-200 rounded-2xl p-6 md:p-8 shadow-sm bg-white font-sans">
       {/* THANH TIẾN TRÌNH */}
@@ -389,7 +567,7 @@ export default function BookingStep1() {
                               la_dang_chon
                                 ? "bg-primary border-primary text-primary-foreground shadow-md"
                                 : !bi_khoa
-                                  ? "border-gray-200 text-gray-600 hover:border-primary bg-white text-gray-700 font-bold"
+                                  ? "border-gray-200 text-gray-600 hover:border-primary bg-white font-bold"
                                   : "bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed"
                             }`}
                           >

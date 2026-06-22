@@ -1,20 +1,23 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+import { Info } from "lucide-react";
 
+/**
+ * Trang /payment không còn được sử dụng.
+ * Luồng thanh toán (upload biên lai R2, reCAPTCHA, OCR) đã được
+ * tích hợp trực tiếp vào BookingStep1 (/booking).
+ */
 export default function Payment() {
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-serif font-bold text-center text-foreground mb-4">Thanh toán đặt cọc</h1>
-
-        <Card className="p-6 flex items-center gap-3" data-testid="khung-thanh-toan">
-          <Clock className="w-5 h-5 text-primary shrink-0" />
-          <p className="text-sm text-muted-foreground">
-            Đang chờ tích hợp API thanh toán để hiển thị hóa đơn, thông tin chuyển khoản và xác nhận biên lai.
-          </p>
-        </Card>
-      </div>
+    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 flex items-center justify-center px-4">
+      <Card className="p-8 max-w-md text-center space-y-3">
+        <Info className="w-10 h-10 text-primary mx-auto" />
+        <h2 className="text-xl font-semibold text-foreground">Trang này đã được tích hợp</h2>
+        <p className="text-sm text-muted-foreground">
+          Luồng thanh toán đặt cọc đã được gộp vào trang đặt lịch.
+          Vui lòng truy cập <strong>/booking</strong> để bắt đầu.
+        </p>
+      </Card>
     </div>
   );
 }
