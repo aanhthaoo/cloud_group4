@@ -26,6 +26,8 @@ export default function BookingStep1() {
   const [link_qr_hien_tai, setLinkQrHienTai] = useState<string | null>(null);
   const [dang_gui, setDangGui] = useState(false);
   const [hien_thong_bao_thanh_cong, setHienThongBaoThanhCong] = useState(false);
+  const [hien_thong_bao_that_bai, setHienThongBaoThatBai] = useState(false);
+  const [loi_xac_nhan, setLoiXacNhan] = useState("");
 
 
 
@@ -35,6 +37,7 @@ export default function BookingStep1() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const [ocrResult, setOcrResult] = useState<{
     ocrStatus: string;
     detectedAmount: number | null;
@@ -154,7 +157,7 @@ export default function BookingStep1() {
 
   // ─── Gọi OCR sau khi đủ điều kiện: đã upload R2 + có captchaToken ────
   // Tự động kích hoạt: dù upload trước hay tick captcha trước, cái xong sau sẽ trigger.
-  const handleConfirm = useCallback(async () => {
+  const handleConfirmOCR = useCallback(async () => {
     if (!uploadedFileName || !captchaToken || !dich_vu_da_chon) return;
 
     const tien_coc = Math.round(Number(dich_vu_da_chon.gia) * 0.3);
@@ -165,6 +168,7 @@ export default function BookingStep1() {
         fileName: uploadedFileName,
         recaptchaToken: captchaToken,
         amountPaid: tien_coc,
+        bookingId: ma_giao_dich
       });
 
       setOcrResult({
@@ -187,28 +191,36 @@ export default function BookingStep1() {
     } finally {
       setIsVerifying(false);
     }
-  }, [uploadedFileName, captchaToken, dich_vu_da_chon]);
+  }, [uploadedFileName, captchaToken, dich_vu_da_chon, ma_giao_dich]);
 
   // OCR tự động chạy ngay khi đủ 2 điều kiện, chỉ trigger 1 lần dựa trên ref.
   // Tránh lỗi vòng lặp khi captchaToken hết hạn giữa lúc OCR đang xử lý.
   useEffect(() => {
     if (uploadedFileName && captchaToken && !hasTriggeredOcr.current) {
       hasTriggeredOcr.current = true;
-      handleConfirm();
+      handleConfirmOCR();
     }
-  }, [uploadedFileName, captchaToken, handleConfirm]);
+  }, [uploadedFileName, captchaToken, handleConfirmOCR]);
 
 
   // ─── Xác nhận cuối — hiển thị popup thành công ───────────────────────
   const xuLyXacNhanThanhToan = async () => {
+    setIsFinalizing(true);
     try {
       if (ma_giao_dich) {
-        await axios.post('/api/xac-nhan-thanh-toan', { id_giao_dich: ma_giao_dich });
+        const phan_hoi = await axios.post('/api/xac-nhan-thanh-toan', { id_giao_dich: ma_giao_dich });
+        if (phan_hoi.data.thanh_cong) {
+          setHienThongBaoThanhCong(true);
+        } else {
+          setLoiXacNhan(phan_hoi.data.loi || "Đối soát biên lai không thành công.");
+          setHienThongBaoThatBai(true);
+        }
       }
-      setHienThongBaoThanhCong(true);
-    } catch (loi) {
+    } catch (loi: any) {
       console.error("Lỗi khi xác nhận thanh toán:", loi);
       toast.error("Có lỗi xảy ra khi xác nhận hệ thống. Vui lòng thử lại.");
+    } finally {
+      setIsFinalizing(false);
     }
   };
 
@@ -275,7 +287,7 @@ export default function BookingStep1() {
               </div>
               <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-gray-400">Ngân hàng:</span> <span className="font-bold text-gray-700">MB Bank</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Tên tài khoản:</span> <span className="font-bold text-gray-700 uppercase">SPA LOTUSGLOW</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Tên tài khoản:</span> <span className="font-bold text-gray-700 uppercase">DINH VAN MANH</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Số tài khoản:</span> <span className="font-black text-primary text-base">0377172930</span></div>
                 <div className="pt-2 border-t border-gray-200">
                   <p className="text-xs text-gray-400 mb-1 font-bold">NỘI DUNG CHUYỂN KHOẢN:</p>
@@ -375,21 +387,23 @@ export default function BookingStep1() {
               size="lg"
               data-testid="button-confirm-payment"
               disabled={
-                hasVerifiedOcr
+                isFinalizing || (hasVerifiedOcr
                   ? false
                   : ocrFailed
                     ? isVerifying
-                    : true
+                    : true)
               }
               onClick={
                 hasVerifiedOcr
                   ? xuLyXacNhanThanhToan
                   : ocrFailed
-                    ? handleConfirm
+                    ? handleConfirmOCR
                     : undefined
               }
             >
-              {isVerifying
+              {isFinalizing
+                ? "Đang đối soát hệ thống..."
+                : isVerifying
                 ? "Đang đọc thông tin biên lai..."
                 : hasVerifiedOcr
                   ? "Xác nhận thông tin & Chốt lịch"
@@ -415,15 +429,38 @@ export default function BookingStep1() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-3 font-serif">Đã nhận biên lai!</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-3 font-serif">Đã xác nhận lịch!</h3>
               <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-                Cảm ơn bạn! LotusGlow đang tiến hành đối soát giao dịch bằng AI. Chúng tôi sẽ gửi thông báo xác nhận lịch hẹn trong giây lát.
+                Tuyệt vời! LotusGlow đã đối soát biên lai thành công. Hẹn gặp bạn tại Spa vào lúc {gio_da_chon} ngày {new Date(ngay_da_chon).toLocaleDateString('vi-VN')}.
               </p>
               <button
                 onClick={() => window.location.href = '/'}
                 className="w-full bg-pink-300 text-white rounded-xl py-3.5 font-bold hover:bg-pink-400 transition-colors shadow-sm"
               >
                 Về trang chủ
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Popup thất bại */}
+        {hien_thong_bao_that_bai && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
+            <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl transform transition-all scale-100">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-3 font-serif">Xác nhận thất bại</h3>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                {loi_xac_nhan}
+              </p>
+              <button
+                onClick={() => setHienThongBaoThatBai(false)}
+                className="w-full bg-gray-200 text-gray-700 rounded-xl py-3.5 font-bold hover:bg-gray-300 transition-colors shadow-sm"
+              >
+                Kiểm tra lại biên lai
               </button>
             </div>
           </div>

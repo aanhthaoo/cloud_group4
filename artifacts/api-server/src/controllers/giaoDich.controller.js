@@ -1,12 +1,47 @@
 const axios = require('axios');
+const { db } = require('../config/firebase');
+const { removeAccents } = require('../utils/receiptParser');
 require('dotenv').config();
 
-// 1. API GET: Lấy thông tin dịch vụ, KTV và trích xuất danh sách Lịch Bận (Soft-hold 15p)
+// Hàm hỗ trợ parse ngày tháng từ OCR và chuẩn hóa về đối tượng Date
+const parseDateOCR = (dateStr) => {
+    if (!dateStr) return null;
+    try {
+        console.log(`[OCR Parse] Đang xử lý chuỗi: "${dateStr}"`);
+        // 1. Thử định dạng DD/MM/YYYY hoặc DD-MM-YYYY
+        const dmyMatch = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+        if (dmyMatch) {
+            const day = dmyMatch[1].padStart(2, '0');
+            const month = dmyMatch[2].padStart(2, '0');
+            const year = dmyMatch[3].length === 2 ? `20${dmyMatch[3]}` : dmyMatch[3];
+
+            const timeMatch = dateStr.match(/(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+            const hh = timeMatch ? timeMatch[1].padStart(2, '0') : "00";
+            const mm = timeMatch ? timeMatch[2].padStart(2, '0') : "00";
+            const ss = (timeMatch && timeMatch[3]) ? timeMatch[3].padStart(2, '0') : "00";
+
+            // Ép kiểu về ISO (Giả định biên lai ở Việt Nam GMT+7)
+            const isoStr = `${year}-${month}-${day}T${hh}:${mm}:${ss}+07:00`;
+            const d = new Date(isoStr);
+            if (!isNaN(d.getTime())) {
+                return d;
+            }
+        }
+
+        // 2. Thử định dạng native
+        const cleanStr = dateStr.replace(/at|lúc/g, '').trim();
+        const d = new Date(cleanStr);
+        if (!isNaN(d.getTime())) return d;
+    } catch (e) {
+        console.error("Lỗi parse ngày OCR:", e.message);
+    }
+    return null;
+};
+
+// 1. API GET: Lấy thông tin dịch vụ, KTV và danh sách Lịch Bận
 const layThongTinDatLich = async (req, res) => {
   try {
     const url_goc = "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/";
-
-    // Gọi song song 3 API để tối ưu tốc độ
     const [phan_hoi_dat_lich, phan_hoi_san_pham, phan_hoi_deal] = await Promise.all([
         axios.get(url_goc + "crm.deal.fields"),
         axios.get(url_goc + "crm.product.list"),
@@ -16,102 +51,52 @@ const layThongTinDatLich = async (req, res) => {
     ]);
 
     const truong_dat_lich = phan_hoi_dat_lich.data.result['UF_CRM_1781780490460'];
-    if (!truong_dat_lich) throw new Error("Không tìm thấy trường cấu hình");
-
-    let cai_dat = truong_dat_lich.settings || truong_dat_lich.SETTINGS || {};
+    let cai_dat = truong_dat_lich?.settings || truong_dat_lich?.SETTINGS || {};
     if (typeof cai_dat === 'string') cai_dat = JSON.parse(cai_dat);
 
-    const mang_dich_vu_bitrix = cai_dat.SERVICE_LIST || [];
-    const mang_ktv_bitrix = cai_dat.SELECTED_RESOURCES || [];
     const kho_san_pham = phan_hoi_san_pham.data.result || [];
-
-    // --- BÓC TÁCH DỊCH VỤ ---
-    const tu_dien_icon = {
-        "Massage thư giãn": "Flower2",
-        "Chăm sóc da mặt": "Sparkles",
-        "Nails & Pedicure": "Droplets",
-        "Waxing": "Scissors",
-        "Gói cô dâu": "Heart"
-    };
-
-    const danh_sach_dich_vu = mang_dich_vu_bitrix.map((dv, vi_tri) => {
-        const ten_dv = dv.name.trim();
-        const san_pham_khop = kho_san_pham.find(sp => sp.NAME.trim() === ten_dv);
-        const mo_ta_goc = san_pham_khop ? san_pham_khop.DESCRIPTION : "Trải nghiệm dịch vụ đẳng cấp";
+    const danh_sach_dich_vu = (cai_dat.SERVICE_LIST || []).map((dv, i) => {
+        const sp = kho_san_pham.find(s => s.NAME.trim() === dv.name.trim());
         return {
-            id: vi_tri + 1,
-            ten: ten_dv,
+            id: i + 1,
+            ten: dv.name.trim(),
             thoi_gian: dv.duration,
-            gia: san_pham_khop ? Math.round(parseFloat(san_pham_khop.PRICE)) : 0,
-            mo_ta: mo_ta_goc.replace(/&nbsp;/g, ' '),
-            icon: tu_dien_icon[ten_dv] || "CheckCircle2"
+            gia: sp ? Math.round(parseFloat(sp.PRICE)) : 0,
+            mo_ta: (sp?.DESCRIPTION || "Dịch vụ Spa chuyên nghiệp").replace(/&nbsp;/g, ' '),
+            icon: "CheckCircle2"
         };
     });
 
-    const tu_dien_ktv = {
-        "Thảo Anh": { vai_tro: "Massage chuyên sâu", danh_gia: "4.9" },
-        "Ngọc Anh": { vai_tro: "Chăm sóc da liễu", danh_gia: "4.8" },
-        "Trang Anh": { vai_tro: "Nghệ thuật Nails", danh_gia: "4.7" },
-        "Vân Anh": { vai_tro: "Waxing & Body", danh_gia: "4.9" },
-        "Diệu Anh": { vai_tro: "Chuyên viên cao cấp", danh_gia: "5.0" }
-    };
+    const danh_sach_ktv = (cai_dat.SELECTED_RESOURCES || []).map(ktv => ({
+        id: ktv.id,
+        ten: ktv.title || ktv.NAME
+    }));
 
-    const danh_sach_ktv = mang_ktv_bitrix.map(ktv => {
-        const ten_ktv = (ktv.title || ktv.NAME).trim();
-        const thong_tin_them = tu_dien_ktv[ten_ktv] || { vai_tro: "Chuyên viên Salon", danh_gia: "5.0" };
-        return {
-            id: ktv.id,
-            ten: ktv.title || ktv.NAME,
-            vai_tro: thong_tin_them.vai_tro,
-            danh_gia: thong_tin_them.danh_gia
-        };
-    });
-
-    // --- LOGIC SOFT-HOLD 15P: TRÍCH XUẤT LỊCH BẬN ---
-    const danh_sach_deal = phan_hoi_deal.data.result || [];
-    const thoi_gian_hien_tai = new Date().getTime();
-    const danh_sach_lich_ban = [];
-
-    danh_sach_deal.forEach(deal => {
-        if (!deal.UF_CRM_1781780490460) return;
-        try {
-            const du_lieu = typeof deal.UF_CRM_1781780490460 === 'string' ? JSON.parse(deal.UF_CRM_1781780490460) : deal.UF_CRM_1781780490460;
-            if (!du_lieu || !du_lieu.date_start) return;
-
-            const thoi_gian_tao = new Date(deal.DATE_CREATE).getTime();
-            const so_phut_da_qua = (thoi_gian_hien_tai - thoi_gian_tao) / (1000 * 60);
-            const trang_thai = String(deal.STAGE_ID).toUpperCase();
-
-            // Điều kiện: Đang giữ chỗ dưới 15p (NEW) HOẶC đã xác nhận (Không phải LOSE/APOLOGY/NEW)
-            const giu_cho_moi = trang_thai.includes('NEW') && so_phut_da_qua <= 15;
-            const da_xac_nhan = !trang_thai.includes('NEW') && !trang_thai.includes('LOSE') && !trang_thai.includes('APOLOGY');
-
-            if (giu_cho_moi || da_xac_nhan) {
-                // Ép kiểu chuỗi, cắt đúng 16 ký tự: "20/06/2026 19:30"
-                const ngay_gio_ban = String(du_lieu.date_start).substring(0, 16);
-                danh_sach_lich_ban.push(ngay_gio_ban);
-            }
-        } catch (e) { console.error("Lỗi parse deal:", e.message); }
-    });
+    const danh_sach_lich_ban = (phan_hoi_deal.data.result || []).map(deal => {
+        if (!deal.UF_CRM_1781780490460) return null;
+        const du_lieu = typeof deal.UF_CRM_1781780490460 === 'string' ? JSON.parse(deal.UF_CRM_1781780490460) : deal.UF_CRM_1781780490460;
+        const thoi_gian_tao = new Date(deal.DATE_CREATE).getTime();
+        const so_phut_da_qua = (Date.now() - thoi_gian_tao) / 60000;
+        const trang_thai = String(deal.STAGE_ID).toUpperCase();
+        if ((trang_thai.includes('NEW') && so_phut_da_qua <= 15) || (!trang_thai.includes('NEW') && !trang_thai.includes('LOSE'))) {
+            return String(du_lieu.date_start).substring(0, 16);
+        }
+        return null;
+    }).filter(Boolean);
 
     return res.status(200).json({ danh_sach_dich_vu, danh_sach_ktv, danh_sach_lich_ban });
   } catch (loi) {
-    console.error("LỖI KHỚP LỆNH:", loi.message);
     return res.status(500).json({ loi: "Lỗi hệ thống" });
   }
 };
 
-// 2. API POST: Chốt lịch hẹn (Sử dụng OPPORTUNITY kiểu Number sạch và tính 30% cọc)
+// 2. API POST: Chốt lịch hẹn
 const chotLichHen = async (req, res) => {
     try {
         const { ten_dich_vu, gia_tien, ten_ktv, ngay_dat, gio_dat, thoi_gian } = req.body;
         const url_goc = "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/";
 
-        // 1. TÍNH TOÁN 30% TIỀN CỌC
-        const chuoi_so_sach = String(gia_tien).replace(/[^0-9]/g, '');
-        const gia_goc = parseInt(chuoi_so_sach, 10);
-        const tien_dat_coc = Math.round(gia_goc * 0.3); // Tính 30% giá gốc
-
+        const tien_dat_coc = Math.round(parseInt(String(gia_tien).replace(/[^0-9]/g, '')) * 0.3);
         const du_lieu_lich = {
             "date_start": `${ngay_dat} ${gio_dat}:00`,
             "duration": parseInt(thoi_gian) * 60,
@@ -119,62 +104,107 @@ const chotLichHen = async (req, res) => {
             "resources": [{ "id": "1", "title": ten_ktv }]
         };
 
-        // 2. TẠO DEAL TRÊN BITRIX24 VỚI GIÁ ĐẶT CỌC
         const phan_hoi = await axios.post(url_goc + "crm.deal.add", {
             fields: {
                 TITLE: `Booking - ${ten_dich_vu}`,
-                STAGE_ID: "NEW", // Soft-hold
-                OPPORTUNITY: tien_dat_coc, // LƯU GIÁ 30% LÊN BITRIX24
+                STAGE_ID: "NEW",
+                OPPORTUNITY: tien_dat_coc,
                 CURRENCY_ID: "VND",
                 UF_CRM_1781780490460: JSON.stringify(du_lieu_lich)
             }
         });
 
         const id_giao_dich = phan_hoi.data.result;
+        const link_qr = `https://img.vietqr.io/image/${process.env.NGAN_HANG || "MB"}-${process.env.SO_TAI_KHOAN || "0377172930"}-compact2.png?amount=${tien_dat_coc}&addInfo=${encodeURIComponent(`LOTUSGLOW DH${id_giao_dich}`)}&accountName=${encodeURIComponent("DINH VAN MANH")}`;
 
-        // 3. TẠO LINK VIETQR VỚI ĐÚNG SỐ TIỀN CỌC
-        const ma_ngan_hang = process.env.NGAN_HANG || "MB";
-        const so_tai_khoan = process.env.SO_TAI_KHOAN || "0377172930";
-        const ten_tai_khoan = encodeURIComponent(process.env.TEN_TAI_KHOAN || "SPA LOTUSGLOW");
-        const noi_dung_ck = encodeURIComponent(`LOTUSGLOW DH${id_giao_dich}`);
-
-        // Nhúng tien_dat_coc vào URL của VietQR
-        const link_qr_dong = `https://img.vietqr.io/image/${ma_ngan_hang}-${so_tai_khoan}-compact2.png?amount=${tien_dat_coc}&addInfo=${noi_dung_ck}&accountName=${ten_tai_khoan}`;
-
-        return res.status(200).json({ thanh_cong: true, id_giao_dich, link_qr: link_qr_dong });
+        return res.status(200).json({ thanh_cong: true, id_giao_dich, link_qr });
     } catch (loi) {
-        console.error("Lỗi tạo lịch hẹn:", loi);
         return res.status(500).json({ loi: "Lỗi hệ thống" });
     }
 };
 
-// 3. API POST: Xác nhận thanh toán (Cập nhật STAGE_ID của Deal)
+// 3. API POST: Xác nhận thanh toán (Đối soát OCR -> Xuất Invoice SPA -> Confirm Deal)
 const xacNhanThanhToan = async (req, res) => {
     try {
         const { id_giao_dich } = req.body;
         const url_goc = "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/";
 
-        if (!id_giao_dich) {
-            return res.status(400).json({ loi: "Thiếu ID giao dịch" });
+        console.log(`[Xác nhận] Bắt đầu đối soát cho Deal ID: ${id_giao_dich}`);
+
+        if (!id_giao_dich) return res.status(400).json({ loi: "Thiếu ID giao dịch" });
+
+        const deal_res = await axios.get(`${url_goc}crm.deal.get?id=${id_giao_dich}`);
+        const deal = deal_res.data.result;
+        if (!deal) return res.status(404).json({ loi: "Không tìm thấy Deal." });
+
+        const snapshot = await db.collection('transactions').where('bookingId', 'in', [String(id_giao_dich), Number(id_giao_dich)]).get();
+        if (snapshot.empty) return res.status(200).json({ thanh_cong: false, loi: "Không tìm thấy dữ liệu biên lai AI." });
+
+        const docs = snapshot.docs.sort((a,b) => (b.data().createdAt?.toMillis() || 0) - (a.data().createdAt?.toMillis() || 0));
+        const transactionDoc = docs[0];
+        const ocr = transactionDoc.data().ocrData || {};
+
+        // --- ĐỐI SOÁT ---
+        const khop_nguoi_nhan = removeAccents(ocr.detectedRecipient || "").toUpperCase().includes("DINH VAN MANH");
+        const khop_so_tien = Math.abs(parseInt(ocr.detectedAmount) - parseInt(deal.OPPORTUNITY)) < 100;
+        const khop_noi_dung = String(ocr.detectedContent || "").toUpperCase().includes(`DH${id_giao_dich}`);
+
+        let khop_thoi_gian = false;
+        const gio_ck = parseDateOCR(ocr.detectedTransferDate);
+        if (gio_ck) {
+            const diff_phut = Math.abs(Date.now() - gio_ck.getTime()) / 60000;
+            console.log(`[Xác nhận] Độ lệch thời gian: ${diff_phut.toFixed(2)} phút`);
+            // YÊU CẦU: Trong vòng 10 phút
+            if (diff_phut <= 10.5) khop_thoi_gian = true;
         }
 
-        // Gọi API cập nhật trạng thái của Deal trên Bitrix24 sang "PREPARATION" (Đã xác nhận)
-        await axios.post(url_goc + "crm.deal.update", {
-            id: id_giao_dich,
-            fields: {
-                STAGE_ID: "PREPARATION"
-            }
-        });
+        if (!khop_nguoi_nhan || !khop_so_tien || !khop_noi_dung || !khop_thoi_gian) {
+            let detail = "Biên lai không hợp lệ: ";
+            if (!khop_nguoi_nhan) detail += "Sai người nhận. ";
+            if (!khop_so_tien) detail += `Số tiền sai (OCR: ${ocr.detectedAmount}đ). `;
+            if (!khop_noi_dung) detail += "Nội dung sai mã đơn. ";
+            if (!khop_thoi_gian) detail += "Thời gian chuyển khoản quá 10 phút hoặc không khớp. ";
 
-        return res.status(200).json({ thanh_cong: true });
+            return res.status(200).json({ thanh_cong: false, loi: detail });
+        }
+
+        // --- CẬP NHẬT BITRIX24 ---
+        try {
+            // A. TẠO HÓA ĐƠN TRONG SPA (Entity Type 31 - Như trong hình ảnh của bạn)
+            await axios.post(`${url_goc}crm.item.add?entityTypeId=31`, {
+                fields: {
+                    title: `Hóa đơn cọc - DH${id_giao_dich}`,
+                    opportunity: deal.OPPORTUNITY,
+                    currencyId: "VND",
+                    parentId2: id_giao_dich, // Liên kết hóa đơn với Deal này (Entity Type 2 là Deal)
+                    opened: "Y"
+                }
+            }).catch(e => console.error("Lỗi tạo SPA Invoice:", e.response?.data || e.message));
+
+            // B. Chuyển trạng thái Deal sang PREPARATION (Đã xác nhận)
+            await axios.post(`${url_goc}crm.deal.update`, {
+                id: id_giao_dich,
+                fields: { STAGE_ID: "PREPARATION" }
+            });
+
+            // C. Cập nhật Firestore
+            await transactionDoc.ref.update({
+                ocrStatus: 'verified',
+                bitrixStatus: 'confirmed',
+                verifiedAt: new Date()
+            });
+
+            return res.status(200).json({ thanh_cong: true });
+        } catch (err) {
+            console.error("Lỗi cập nhật Bitrix24:", err.message);
+            return res.status(500).json({ loi: "Lỗi Bitrix24: " + err.message });
+        }
     } catch (loi) {
-        console.error("Lỗi cập nhật Bitrix24:", loi.message);
-        return res.status(500).json({ loi: "Lỗi hệ thống khi cập nhật trạng thái" });
+        console.error("Lỗi server xacNhanThanhToan:", loi);
+        return res.status(500).json({ loi: "Lỗi hệ thống: " + loi.message });
     }
 };
 
-const giuChoVaTaoQR = async (req, res) => {
-  return res.status(404).json({ thong_bao: "Vui lòng sử dụng /api/chot-lich-hen" });
-};
+const giuChoVaTaoQR = (req, res) => res.status(404).json({ thong_bao: "Dùng /api/chot-lich-hen" });
 
 module.exports = { layThongTinDatLich, chotLichHen, xacNhanThanhToan, giuChoVaTaoQR };
