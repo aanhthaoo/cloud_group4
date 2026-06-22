@@ -170,7 +170,7 @@ const xacNhanThanhToan = async (req, res) => {
 
         // --- CẬP NHẬT BITRIX24 ---
         try {
-            // A. TẠO HÓA ĐƠN TRONG SPA (Entity Type 31 - Như trong hình ảnh của bạn)
+            // A. TẠO HÓA ĐƠN TRONG SPA (Entity Type 31)
             await axios.post(`${url_goc}crm.item.add?entityTypeId=31`, {
                 fields: {
                     title: `Hóa đơn cọc - DH${id_giao_dich}`,
