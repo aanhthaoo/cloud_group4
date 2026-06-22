@@ -12,11 +12,10 @@ router.use('/api/auth', authRoutes);
 // Tích hợp phân hệ Giao dịch Lõi (Giữ chỗ & VietQR)
 router.use('/api', giaoDichRoutes);
 
-router.get('/api/availability', (req, res) => {
-  // TODO: Tích hợp logic lấy dữ liệu availability thực tế
+router.get("/api/availability", (req, res) => {
   res.status(200).json({
-    message: 'Availability data',
-    data: []
+    message: "Availability data",
+    data: [],
   });
 });
 
