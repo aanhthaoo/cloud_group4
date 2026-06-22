@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import api from "@/lib/axios";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -36,15 +37,58 @@ export default function Booking() {
   };
 
   const handleNext = () => {
-    if (step === 1 && selectedService && selectedTech) {
-      setStep(2);
-    } else if (step === 2 && selectedDate && selectedTime) {
+    const parsePrice = (price: string) => {
+  return Number(String(price || "0").replace(/[^\d]/g, ""));
+};
+
+const handleNext = async () => {
+  if (step === 1 && selectedService && selectedTech) {
+    setStep(2);
+    return;
+  }
+
+  if (step === 2 && selectedDate && selectedTime) {
+    try {
+      const user = JSON.parse(localStorage.getItem("lotus_user") || "{}");
+
+      if (!user?.uid) {
+        alert("Bạn cần đăng nhập trước khi đặt lịch");
+        setLocation("/login");
+        return;
+      }
+
+      const payload = {
+        uid: user.uid,
+        customerName: user.fullName || user.name,
+        customerEmail: user.email,
+        customerPhone: user.phoneNumber || user.phone,
+        serviceName: selectedService.name,
+        technicianName: selectedTech.name,
+        appointmentDate: selectedDate,
+        appointmentTime: selectedTime,
+        totalAmount: parsePrice(selectedService.price),
+      };
+
+      const response = await api.post("/api/bookings", payload);
+
+      localStorage.setItem(
+        "pending_booking",
+        JSON.stringify(response.data.data)
+      );
+
       setIsLocked(true);
+
       setTimeout(() => {
         setLocation("/payment");
       }, 1000);
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.message ||
+          "Không thể tạo lịch hẹn. Vui lòng thử lại."
+      );
     }
-  };
+  }
+};
 
   const handleBack = () => {
     if (step > 1) {
@@ -147,4 +191,5 @@ export default function Booking() {
       </div>
     </div>
   );
+  }
 }

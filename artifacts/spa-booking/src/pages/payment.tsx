@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Upload, Check, Clock, AlertTriangle } from "lucide-react";
@@ -10,6 +11,7 @@ export default function Payment() {
   const [, setLocation] = useLocation();
   const [isChecked, setIsChecked] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(HOLD_SECONDS);
   const [expired, setExpired] = useState(false);
 
@@ -34,8 +36,41 @@ export default function Payment() {
   };
 
   const handleConfirm = () => {
+    const handleConfirm = async () => {
+  try {
+    if (!isChecked) {
+      alert("Vui lòng xác nhận Tôi không phải robot");
+      return;
+    }
+
+    const pendingBooking = JSON.parse(
+      localStorage.getItem("pending_booking") || "{}"
+    );
+
+    if (!pendingBooking?.bookingId) {
+      alert("Không tìm thấy lịch hẹn tạm thời. Vui lòng đặt lịch lại.");
+      setLocation("/booking");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    await api.post(`/api/bookings/${pendingBooking.bookingId}/confirm-payment`, {
+      receiptFileName: file?.name || "no_receipt_uploaded.jpg",
+    });
+
+    localStorage.removeItem("pending_booking");
+
     setLocation("/booking-status");
-  };
+  } catch (error: any) {
+    alert(
+      error?.response?.data?.message ||
+        "Xác nhận thanh toán thất bại. Vui lòng thử lại."
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
@@ -136,15 +171,12 @@ export default function Payment() {
             </div>
 
             <Button
-              className="w-full h-14 text-lg font-medium shadow-md"
-              size="lg"
-              data-testid="button-confirm-payment"
-              disabled={!isChecked || !file || expired}
+              disabled={!isChecked || expired || isSubmitting}
               onClick={handleConfirm}
-            >
-              Xác nhận chốt lịch
+              data-testid="button-confirm-payment"
+              >
+                {isSubmitting ? "Đang xử lý..." : "Xác nhận chốt lịch"}
             </Button>
-
             {expired && (
               <p className="text-red-600 text-sm font-medium text-center flex items-center justify-center gap-1">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -156,4 +188,5 @@ export default function Payment() {
       </div>
     </div>
   );
+}
 }
