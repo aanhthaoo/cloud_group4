@@ -301,13 +301,7 @@ const layLichSuDatHen = async (req, res) => {
         // Chuyển kết quả sang mảng để sort (vì Firestore có thể yêu cầu index nếu order kết hợp where)
         const bookings = [];
         bookingsSnapshot.forEach(doc => bookings.push({ id: doc.id, ...doc.data() }));
-        
-        // Sắp xếp giảm dần theo thời gian KHÁCH ĐẶT (appointmentDate + appointmentTime) thay vì thời gian TẠO BOOKING (createdAt)
-        bookings.sort((a, b) => {
-            const timeA = new Date(`${a.appointmentDate || '1970-01-01'}T${a.appointmentTime || '00:00'}:00+07:00`).getTime();
-            const timeB = new Date(`${b.appointmentDate || '1970-01-01'}T${b.appointmentTime || '00:00'}:00+07:00`).getTime();
-            return timeB - timeA;
-        });
+        bookings.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
         bookings.forEach(booking => {
             let hien_thi_ngay = booking.appointmentDate || "--/--/----";
@@ -318,7 +312,7 @@ const layLichSuDatHen = async (req, res) => {
                 // Định dạng ISO: YYYY-MM-DDTHH:mm:00+07:00
                 const rawDate = `${booking.appointmentDate}T${booking.appointmentTime}:00+07:00`;
                 compare_date = new Date(rawDate);
-                
+
                 if (!isNaN(compare_date.getTime())) {
                     hien_thi_ngay = compare_date.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
                     hien_thi_gio = compare_date.toLocaleTimeString('vi-VN', {

@@ -294,7 +294,7 @@ async function createBitrixDeal(data) {
 // ---------------------------------------------------------------------------
 async function getUnavailableSlots(req, res) {
   try {
-    const { date, resourceId } = req.query;
+    const { date, resourceId, technicianName } = req.query;
 
     if (!date || !resourceId) {
       return res.status(400).json({
@@ -328,9 +328,26 @@ async function getUnavailableSlots(req, res) {
       })
       .map((doc) => doc.data().timeSlot);
 
+    // Thêm check từ booking_payments (những giao dịch đã thanh toán thành công thông qua flow Bitrix)
+    if (technicianName) {
+      const paymentsSnapshot = await db
+        .collection('booking_payments')
+        .where('appointmentDate', '==', date)
+        .get();
+        
+      paymentsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.status === 'invoice_success' && data.technicianName === technicianName) {
+          if (data.appointmentTime) {
+            unavailableSlots.push(data.appointmentTime);
+          }
+        }
+      });
+    }
+
     return res.status(200).json({
       status: 'success',
-      data: unavailableSlots,
+      data: [...new Set(unavailableSlots)],
     });
   } catch (error) {
     console.error('[getUnavailableSlots] Lỗi:', error);
@@ -359,6 +376,18 @@ async function createBookingWithCheck(req, res) {
     }
 
     const now = new Date();
+    
+    // Kiểm tra ngày trong quá khứ
+    const hom_nay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [year, month, day] = date.split('-').map(Number);
+    const ngay_chon = new Date(year, month - 1, day);
+    
+    if (ngay_chon.getTime() < hom_nay.getTime()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Không thể đặt lịch cho ngày trong quá khứ',
+      });
+    }
 
     // ------------------------------------------------------------------
     // BƯỚC 1: Kiểm tra xung đột — có booking hợp lệ nào chiếm slot này không?
@@ -389,6 +418,30 @@ async function createBookingWithCheck(req, res) {
         status: 'conflict',
         message: 'Khung giờ này vừa có người đặt, vui lòng chọn giờ khác',
       });
+    }
+
+    // ------------------------------------------------------------------
+    // BƯỚC 1.5: Kiểm tra xung đột trong booking_payments (giao dịch đã paid qua Bitrix)
+    // ------------------------------------------------------------------
+    const technicianName = customerData?.ten_ktv;
+    if (technicianName) {
+      const paymentsSnapshot = await db
+        .collection('booking_payments')
+        .where('appointmentDate', '==', date)
+        .where('appointmentTime', '==', timeSlot)
+        .get();
+        
+      const isPaidConflict = paymentsSnapshot.docs.find((doc) => {
+        const data = doc.data();
+        return data.status === 'invoice_success' && data.technicianName === technicianName;
+      });
+
+      if (isPaidConflict) {
+        return res.status(409).json({
+          status: 'conflict',
+          message: 'Khung giờ này vừa có người thanh toán thành công, vui lòng chọn giờ khác',
+        });
+      }
     }
 
     // ------------------------------------------------------------------
