@@ -77,7 +77,15 @@ const layThongTinDatLich = async (req, res) => {
 
     return res.status(200).json({ danh_sach_dich_vu, danh_sach_ktv, danh_sach_lich_ban });
   } catch (loi) {
-    return res.status(500).json({ loi: "Lỗi hệ thống" });
+    // Log chi tiết để debug khi Bitrix trả về lỗi
+    console.error('[layThongTinDatLich] Lỗi gọi Bitrix24:', loi.response?.data || loi.message);
+    // Trả về mảng rỗng thay vì để Frontend bị crash khi .map() trên undefined
+    return res.status(500).json({
+      loi: "Lỗi hệ thống khi kết nối Bitrix24",
+      danh_sach_dich_vu: [],
+      danh_sach_ktv: [],
+      danh_sach_lich_ban: []
+    });
   }
 };
 

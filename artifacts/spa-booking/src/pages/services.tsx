@@ -8,15 +8,23 @@ import { Badge } from "@/components/ui/badge";
 export default function Services() {
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     const fetchServices = async () => {
       try {
         const response = await axios.get("/api/thong-tin-dat-lich");
-        setServices(response.data.danh_sach_dich_vu);
+        // Fallback rỗng nếu API trả về lỗi có mảng rỗng kèm theo
+        const data = response.data.danh_sach_dich_vu || [];
+        setServices(data);
+        if (data.length === 0) {
+          setError("Không tải được danh sách dịch vụ. Hệ thống đang được bảo trì.");
+        }
       } catch (error) {
         console.error("Lỗi tải danh sách dịch vụ:", error);
+        setServices([]); // đảm bảo không bao giờ là undefined
+        setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
       } finally {
         setLoading(false);
       }
@@ -85,6 +93,24 @@ export default function Services() {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="animate-pulse text-primary font-serif text-xl">Đang tải dịch vụ...</div>
+    </div>
+  );
+
+  if (error || services.length === 0) return (
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="text-center space-y-4 max-w-md">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+          <ThuVienIcon.WifiOff className="w-8 h-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-700">Không thể tải dịch vụ</h2>
+        <p className="text-gray-400 text-sm">{error || "Danh sách dịch vụ trống."}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-pink-300 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-pink-400 transition-colors"
+        >
+          Thử lại
+        </button>
+      </div>
     </div>
   );
 
