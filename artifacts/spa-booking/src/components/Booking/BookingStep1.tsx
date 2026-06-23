@@ -13,7 +13,10 @@ export default function BookingStep1() {
   // ─── 1. State chọn lịch ───────────────────────────────────────────────
   const [danh_sach_dich_vu, setDanhSachDichVu] = useState<any[]>([]);
   const [danh_sach_ktv, setDanhSachKtv] = useState<any[]>([]);
-  const [danh_sach_lich_ban, setDanhSachLichBan] = useState<string[]>([]);
+  // unavailable_slots: mảng timeSlot đã bị đặt cho (ngày + KTV) hiện tại
+  // Được cập nhật realtime từ GET /api/bookings/unavailable-slots
+  const [unavailable_slots, setUnavailableSlots] = useState<string[]>([]);
+  const [dang_tai_lich, setDangTaiLich] = useState(false); // loading riêng cho slot
   const [dang_tai, setDangTai] = useState(true);
 
   const [buoc_hien_tai, setBuocHienTai] = useState(1);
@@ -28,6 +31,10 @@ export default function BookingStep1() {
   const [hien_thong_bao_thanh_cong, setHienThongBaoThanhCong] = useState(false);
   const [hien_thong_bao_that_bai, setHienThongBaoThatBai] = useState(false);
   const [loi_xac_nhan, setLoiXacNhan] = useState("");
+
+  // ─── Đồng hồ đếm ngược 15 phút ────────────────────────────────
+  // Số giây còn lại, bắt đầu từ 900 (15*60). -1 = chưa khởi động.
+  const [thoi_gian_con_lai, setThoiGianConLai] = useState<number>(-1);
 
 
 
@@ -51,14 +58,14 @@ export default function BookingStep1() {
 
   const mang_khung_gio = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30"];
 
-  // ─── Load dữ liệu ban đầu ────────────────────────────────────────────
+  // ─── Load dữ liệu ban đầu (dịch vụ + KTV) ───────────────────────────
   useEffect(() => {
     const taiDuLieu = async () => {
       try {
         const phan_hoi = await axios.get("/api/thong-tin-dat-lich");
         setDanhSachDichVu(phan_hoi.data.danh_sach_dich_vu);
         setDanhSachKtv(phan_hoi.data.danh_sach_ktv);
-        setDanhSachLichBan(phan_hoi.data.danh_sach_lich_ban || []);
+        // Không còn dùng danh_sach_lich_ban tĩnh từ đây nữa
       } catch (loi) {
         console.error("Lỗi tải dữ liệu:", loi);
       } finally {
@@ -67,6 +74,50 @@ export default function BookingStep1() {
     };
     taiDuLieu();
   }, []);
+
+  // ─── Fetch lịch đã đặt realtime mỗi khi đổi ngày hoặc KTV ───────────
+  // Gọi GET /api/bookings/unavailable-slots để lấy mảng giờ đã bị đặt.
+  // Chỉ gọi khi đã chọn KTV (resourceId cần thiết cho query).
+  useEffect(() => {
+    if (!ktv_da_chon?.id) {
+      setUnavailableSlots([]);
+      return;
+    }
+    const fetchUnavailableSlots = async () => {
+      setDangTaiLich(true);
+      try {
+        const res = await api.get("/api/bookings/unavailable-slots", {
+          params: { date: ngay_da_chon, resourceId: ktv_da_chon.id },
+        });
+        setUnavailableSlots(res.data.data || []);
+      } catch (loi) {
+        console.error("Lỗi tải lịch bận:", loi);
+        setUnavailableSlots([]);
+      } finally {
+        setDangTaiLich(false);
+      }
+    };
+    fetchUnavailableSlots();
+  }, [ngay_da_chon, ktv_da_chon]);
+
+  // ─── Đồng hồ đếm ngược ─────────────────────────────────────────
+  // Khởi động khi ma_giao_dich được tạo, cập nhật mỗi giây, dừng khi về 0.
+  useEffect(() => {
+    if (thoi_gian_con_lai < 0) return; // chưa khởi động
+    if (thoi_gian_con_lai === 0) return; // đã hết giờ
+
+    const interval = setInterval(() => {
+      setThoiGianConLai((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval); // cleanup khi unmount hoặc reset
+  }, [thoi_gian_con_lai]);
 
   // ─── Validate giờ hợp lệ ─────────────────────────────────────────────
   const kiemTraGioHopLe = (gio: string, ngay_da_chon_param: string) => {
@@ -91,10 +142,30 @@ export default function BookingStep1() {
 
 
 
-  // ─── Chốt lịch ───────────────────────────────────────────────────────
+  // ─── Chốt lịch (có kiểm tra conflict 409 trước khi ghi) ─────────────
   const xửLýChốtLịch = async () => {
     setDangGui(true);
     try {
+      // BƯỚC 1: Tạo soft-hold 15 phút qua API mới.
+      // Nếu slot vừa bị người khác đặt → 409, báo lỗi ngay.
+      const holdRes = await api.post("/api/bookings/create", {
+        date: ngay_da_chon,
+        timeSlot: gio_da_chon,
+        resourceId: ktv_da_chon.id,
+        customerData: {
+          ten_dich_vu: dich_vu_da_chon.ten,
+          gia_tien: dich_vu_da_chon.gia,
+          ten_ktv: ktv_da_chon.ten,
+          thoi_gian: dich_vu_da_chon.thoi_gian,
+        },
+      });
+
+      // Lấy thời điểm hết hạn để tính số giây đếm ngược chính xác
+      const expiresAt = new Date(holdRes.data.data.softHoldExpiresAt);
+      const secondsLeft = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+      setThoiGianConLai(secondsLeft); // khởi động đồng hồ
+
+      // BƯỚC 2: Slot đã giữ xong → tiến hành tạo giao dịch & QR
       const phan_hoi = await axios.post("/api/chot-lich-hen", {
         ten_dich_vu: dich_vu_da_chon.ten,
         gia_tien: dich_vu_da_chon.gia,
@@ -108,9 +179,20 @@ export default function BookingStep1() {
         setMaGiaoDich(phan_hoi.data.id_giao_dich);
         setLinkQrHienTai(phan_hoi.data.link_qr);
       }
-    } catch (loi) {
+    } catch (loi: any) {
       console.error("Lỗi chốt lịch:", loi);
-      toast.error("Không thể chốt lịch hẹn. Vui lòng thử lại!");
+      if (loi.response?.status === 409) {
+        toast.error(loi.response.data.message || "Khung giờ này vừa có người đặt, vui lòng chọn giờ khác");
+        if (ktv_da_chon?.id) {
+          const res = await api.get("/api/bookings/unavailable-slots", {
+            params: { date: ngay_da_chon, resourceId: ktv_da_chon.id },
+          });
+          setUnavailableSlots(res.data.data || []);
+          setGioDaChon(null);
+        }
+      } else {
+        toast.error("Không thể chốt lịch hẹn. Vui lòng thử lại!");
+      }
     } finally {
       setDangGui(false);
     }
@@ -234,16 +316,69 @@ export default function BookingStep1() {
     </div>
   );
 
-  // ─── MÀNN HÌNH THANH TOÁN ĐẶT CỌC (khi đã có mã giao dịch) ─────────
+  // ─── MàN HÌNH THANH TOÁN ĐẶT CỌC (khi đã có mã giao dịch) ───────
   if (ma_giao_dich) {
     const tong_cong = Number(dich_vu_da_chon.gia);
     const tien_coc = Math.round(tong_cong * 0.3);
     const tien_con_lai = tong_cong - tien_coc;
 
+    // Định dạng MM:SS cho đồng hồ đếm ngược
+    const phut = Math.floor(thoi_gian_con_lai / 60).toString().padStart(2, '0');
+    const giay = (thoi_gian_con_lai % 60).toString().padStart(2, '0');
+    const da_het_gio = thoi_gian_con_lai === 0;
+    // Cảnh báo đỏ khi còn đưới 3 phút
+    const sap_het_gio = thoi_gian_con_lai > 0 && thoi_gian_con_lai <= 180;
+
     return (
       <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
 
-        <div className="grid md:grid-cols-2 gap-8">
+        {/* BANNER ĐỒNG HỒ ĐẾM NGƯỢC */}
+        {thoi_gian_con_lai >= 0 && (
+          <div className={`mb-6 rounded-2xl px-5 py-4 flex items-center justify-between border transition-all duration-500 ${
+            da_het_gio
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : sap_het_gio
+              ? 'bg-orange-50 border-orange-300 text-orange-800'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+          }`}>
+            <div className="flex items-center gap-3">
+              <ThuVienIcon.Timer className={`w-5 h-5 shrink-0 ${
+                da_het_gio ? 'text-red-500' : sap_het_gio ? 'text-orange-500 animate-pulse' : 'text-emerald-500'
+              }`} />
+              <div>
+                <p className="font-bold text-sm">
+                  {da_het_gio ? '⚠️ Thời gian giữ chỗ đã hết!' : 'Slot đang được giữ cho bạn'}
+                </p>
+                <p className="text-xs opacity-75">
+                  {da_het_gio
+                    ? 'Slot có thể đã được người khác đặt. Vui lòng quay lại chọn giờ mới.'
+                    : sap_het_gio
+                    ? 'Còn rất ít thời gian! Hãy hoàn tất thanh toán ngay.'
+                    : 'Hoàn tất thanh toán trước khi hết giờ giữ chỗ.'}
+                </p>
+              </div>
+            </div>
+            {/* Đồng hồ */}
+            {!da_het_gio ? (
+              <div className={`font-mono text-2xl font-black tracking-widest px-4 py-2 rounded-xl ${
+                sap_het_gio ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {phut}:{giay}
+              </div>
+            ) : (
+              <button
+                onClick={() => { setMaGiaoDich(null); setThoiGianConLai(-1); setGioDaChon(null); }}
+                className="text-xs font-bold bg-red-100 text-red-700 px-4 py-2 rounded-xl hover:bg-red-200 transition-colors"
+              >
+                Chọn lại giờ
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Overlay mờ khi hết giờ — vẫn cho nhìn thấy nội dung nhưng disabled */}
+        <div className={`relative transition-opacity duration-700 ${da_het_gio ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+          <div className="grid md:grid-cols-2 gap-8">
           {/* CỘT TRÁI: HÓA ĐƠN & NGÂN HÀNG */}
           <div className="space-y-6">
             <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
@@ -419,6 +554,7 @@ export default function BookingStep1() {
 
           </div>
         </div>
+        </div>{/* /relative overlay wrapper */}
 
         {/* Popup thành công */}
         {hien_thong_bao_thanh_cong && (
@@ -589,10 +725,10 @@ export default function BookingStep1() {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {mang_khung_gio.map((gio) => {
-                        const chuoi_kiem_tra = `${ngay_da_chon} ${gio}`;
-                        const bi_trung_lich = danh_sach_lich_ban.includes(chuoi_kiem_tra);
+                        // Kiểm tra slot theo mảng realtime từ API /unavailable-slots
+                        const bi_trung_lich = unavailable_slots.includes(gio);
                         const bi_qua_gio = !kiemTraGioHopLe(gio, ngay_da_chon);
-                        const bi_khoa = bi_qua_gio || bi_trung_lich;
+                        const bi_khoa = bi_qua_gio || bi_trung_lich || dang_tai_lich;
                         const la_dang_chon = gio_da_chon === gio;
 
                         return (
