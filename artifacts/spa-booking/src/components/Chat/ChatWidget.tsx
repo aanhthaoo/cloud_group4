@@ -176,21 +176,11 @@ async function openHubSpotChat() {
   });
 
   if (ready && window.HubSpotConversations?.widget?.open) {
+    // Trust HubSpot's own API — if open() exists and we can call it, the widget will open.
+    // DOM visibility check was causing false negatives on production (iframe renders slower
+    // or uses CSS class changes instead of display:none).
     window.HubSpotConversations.widget.open();
-
-    // Wait up to 1s to confirm the widget iframe actually appeared in DOM
-    const appeared = await new Promise<boolean>((resolve) => {
-      const deadline = Date.now() + 1000;
-      const check = () => {
-        if (isHubSpotWidgetVisible()) { resolve(true); return; }
-        if (Date.now() >= deadline) { resolve(false); return; }
-        setTimeout(check, 100);
-      };
-      check();
-    });
-
-    console.debug("[HubSpot] widget appeared in DOM:", appeared);
-    return appeared;
+    return true;
   }
 
   return false;
@@ -249,6 +239,15 @@ export default function ChatWidget() {
     setHandoffStatus("connecting");
     appendSystemMessage("Đang kết nối bạn với nhân viên hỗ trợ...");
 
+    const payload = {
+      sessionId,
+      userEmail: user?.email,
+      messageCount: currentMessages.length,
+      reason: metadata?.handoffReason,
+    };
+    console.group(`[Chat:Handoff] POST /api/chat/handoff`);
+    console.log("→ Request:", payload);
+
     try {
       const handoffResponse = await api.post<HandoffResponse>("/api/chat/handoff", {
         sessionId,
@@ -257,7 +256,17 @@ export default function ChatWidget() {
         metadata,
       });
 
+      console.log("← Response:", {
+        status: handoffResponse.status,
+        hubspotSaved: handoffResponse.data.hubspotSaved,
+        contactId: handoffResponse.data.contactId,
+        noteId: handoffResponse.data.noteId,
+        hubspotError: handoffResponse.data.hubspotError,
+      });
+
       const opened = await openHubSpotChat();
+      console.log("[Chat:Handoff] widget opened:", opened);
+      console.groupEnd();
 
       if (!opened) {
         // Widget didn't appear — keep AI chat open and show a helpful message
@@ -276,8 +285,14 @@ export default function ChatWidget() {
         setHandoffStatus("connected");
         setIsOpen(false);
       }
-    } catch (error) {
-      console.error("Handoff error:", error);
+    } catch (error: unknown) {
+      console.groupEnd();
+      const axiosErr = error as { response?: { status: number; data: unknown }; message?: string };
+      console.error("[Chat:Handoff] ✗ Error:", {
+        status: axiosErr?.response?.status,
+        body: axiosErr?.response?.data,
+        message: axiosErr?.message,
+      });
       appendSystemMessage("Chưa thể chuyển sang nhân viên lúc này. Bạn vui lòng thử lại sau.");
       setHandoffStatus("idle");
     }
@@ -300,12 +315,25 @@ export default function ChatWidget() {
     setInput("");
     setIsSending(true);
 
+    console.group(`[Chat] POST /api/chat/message`);
+    console.log("→ Request:", { sessionId, message: messageText });
+
     try {
       const response = await api.post<ChatResponse>("/api/chat/message", {
         sessionId,
         message: messageText,
         user,
       });
+
+      console.log("← Response:", {
+        status: response.status,
+        intent: response.data.intent,
+        confidence: response.data.confidence,
+        isFallback: response.data.isFallback,
+        handoffRequired: response.data.handoffRequired,
+        handoffReason: response.data.handoffReason,
+      });
+      console.groupEnd();
 
       const botMessage: Message = {
         id: Date.now() + 1,
@@ -323,8 +351,14 @@ export default function ChatWidget() {
           lastConfidence: response.data.confidence,
         });
       }
-    } catch (error) {
-      console.error("Chat error:", error);
+    } catch (error: unknown) {
+      console.groupEnd();
+      const axiosErr = error as { response?: { status: number; data: unknown }; message?: string };
+      console.error("[Chat] ✗ Error:", {
+        status: axiosErr?.response?.status,
+        body: axiosErr?.response?.data,
+        message: axiosErr?.message,
+      });
       setMessages((prev) => [
         ...prev,
         {
