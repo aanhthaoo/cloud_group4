@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import axios from "axios";
+import api from "@/lib/axios";
 import * as ThuVienIcon from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ export default function Services() {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await axios.get("/api/thong-tin-dat-lich");
+        const response = await api.get("/api/thong-tin-dat-lich");
         // Fallback rỗng nếu API trả về lỗi có mảng rỗng kèm theo
         const data = response.data.danh_sach_dich_vu || [];
         setServices(data);
