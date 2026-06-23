@@ -186,7 +186,7 @@ export default function Register() {
               <Turnstile
                 ref={turnstileRef}
                 siteKey={TURNSTILE_SITE_KEY}
-                onSuccess={(token) => setTurnstileToken(token)}
+                onSuccess={(token: string) => setTurnstileToken(token)}
                 onExpire={() => setTurnstileToken(null)}
                 onError={() => {
                   setTurnstileToken(null);

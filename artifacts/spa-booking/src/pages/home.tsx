@@ -2,8 +2,10 @@ import React from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Clock, Flower, Droplets } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Home() {
+  const { isLoggedIn } = useAuth();
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col">
       {/* Hero Section */}
@@ -26,11 +28,13 @@ export default function Home() {
                 Thẻ thành viên
               </Button>
             </Link>
-            <Link href="/register">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8 py-6 rounded-full border-2 border-secondary-foreground text-secondary-foreground hover:bg-secondary/30" data-testid="button-register-home">
-                Đăng ký ngay
-              </Button>
-            </Link>
+            {!isLoggedIn && (
+              <Link href="/register">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8 py-6 rounded-full border-2 border-secondary-foreground text-secondary-foreground hover:bg-secondary/30" data-testid="button-register-home">
+                  Đăng ký ngay
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>

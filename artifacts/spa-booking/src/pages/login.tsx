@@ -89,15 +89,12 @@ export default function Login() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 pb-8">
-            <Button
-              type="submit"
-              className="w-full h-12 text-lg shadow-sm"
-              {/* Cloudflare Turnstile widget */}
+            {/* Cloudflare Turnstile widget */}
             <div className="w-full flex justify-center">
               <Turnstile
                 ref={turnstileRef}
                 siteKey={TURNSTILE_SITE_KEY}
-                onSuccess={(token) => setTurnstileToken(token)}
+                onSuccess={(token: string) => setTurnstileToken(token)}
                 onExpire={() => setTurnstileToken(null)}
                 onError={() => {
                   setTurnstileToken(null);

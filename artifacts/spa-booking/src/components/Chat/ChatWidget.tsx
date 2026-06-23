@@ -1,14 +1,29 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Headphones } from "lucide-react";
+import { Headphones, Loader2, MessageCircle, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
-import { useLocation } from "wouter";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import api from "@/lib/axios";
+
+declare global {
+  interface Window {
+    HubSpotConversations?: {
+      widget?: {
+        load?: () => void;
+        open?: () => void;
+        refresh?: () => void;
+      };
+    };
+    hsConversationsOnReady?: Array<() => void>;
+  }
+}
 
 interface Message {
   id: number;
-  from: "he_thong";
+  from: "bot" | "user" | "system";
   text: string;
 }
 
@@ -172,7 +187,7 @@ async function openHubSpotChat() {
 }
 
 export default function ChatWidget() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -203,10 +218,10 @@ export default function ChatWidget() {
   }, []);
 
   useEffect(() => {
-    if (trang_thai_mo) tham_chieu_cuoi.current?.scrollIntoView({ behavior: "smooth" });
-  }, [danh_sach_tin_nhan, trang_thai_mo]);
+    if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isOpen, isSending]);
 
-  const xu_ly_bat_tat = () => {
+  const handleToggle = () => {
     if (!isLoggedIn) {
       setLocation("/login");
       return;
@@ -366,7 +381,7 @@ export default function ChatWidget() {
       }}
     >
       <AnimatePresence>
-        {trang_thai_mo && (
+        {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -374,7 +389,7 @@ export default function ChatWidget() {
             transition={{ duration: 0.2 }}
             className="mb-4 origin-bottom-right"
           >
-            <Card className="w-[320px] shadow-xl border-primary/20">
+            <Card className="w-[340px] shadow-xl border-primary/20">
               <CardHeader className="bg-primary/10 py-3 px-4 flex flex-row items-center justify-between rounded-t-lg border-b border-primary/10">
                 <div className="font-medium text-foreground flex items-center gap-2">
                   <span className="relative flex h-3 w-3">
@@ -383,39 +398,87 @@ export default function ChatWidget() {
                   </span>
                   Lễ tân AI
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-white" onClick={() => dat_trang_thai_mo(false)} data-testid="button-close-chat">
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-white" onClick={() => setIsOpen(false)} data-testid="button-close-chat">
                   <X className="h-4 w-4" />
                 </Button>
               </CardHeader>
 
-              <CardContent className="p-4 flex flex-col gap-3 h-[240px] overflow-y-auto bg-slate-50/50">
-                <p className="text-sm text-muted-foreground" data-testid="khung-chat-api">
-                  Khung chat đang chờ tích hợp API hội thoại và lịch sử tin nhắn.
-                </p>
-                {danh_sach_tin_nhan.map((tin_nhan) => (
-                  <div key={tin_nhan.id} className="flex gap-2">
-                    <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                      <Headphones className="w-4 h-4 text-secondary-foreground" />
+              <CardContent className="p-4 flex flex-col gap-3 h-[320px] overflow-y-auto bg-slate-50/50">
+                {messages.map((msg) => {
+                  if (msg.from === "user") {
+                    return (
+                      <div key={msg.id} className="flex justify-end">
+                        <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none p-3 text-sm shadow-sm max-w-[78%]">
+                          {msg.text}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={msg.id} className="flex gap-2">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs shrink-0 ${msg.from === "bot" ? "bg-primary/20 text-primary" : "bg-secondary"}`}>
+                        {msg.from === "bot" ? "AI" : <Headphones className="w-4 h-4 text-secondary-foreground" />}
+                      </div>
+                      <div className={`border rounded-2xl rounded-tl-none p-3 text-sm shadow-sm max-w-[78%] ${msg.from === "bot" ? "bg-white border-border" : "bg-secondary/30 border-secondary/40 text-secondary-foreground"}`}>
+                        {msg.text}
+                      </div>
                     </div>
-                    <div className="bg-secondary/30 border border-secondary/40 rounded-2xl rounded-tl-none p-3 text-sm text-secondary-foreground shadow-sm">
-                      {tin_nhan.text}
+                  );
+                })}
+                {isSending && (
+                  <div className="flex gap-2">
+                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs shrink-0">AI</div>
+                    <div className="bg-white border border-border rounded-2xl rounded-tl-none p-3 text-sm shadow-sm flex items-center gap-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Đang trả lời...
                     </div>
                   </div>
-                ))}
-                <div ref={tham_chieu_cuoi} />
+                )}
+                <div ref={bottomRef} />
               </CardContent>
 
               <CardFooter className="p-3 bg-white border-t flex flex-col gap-2 rounded-b-lg">
+                <form onSubmit={handleSubmit} className="flex gap-2 w-full">
+                  <Input
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    placeholder="Nhập tin nhắn..."
+                    disabled={isSending}
+                    data-testid="input-chat-message"
+                    className="h-9"
+                  />
+                  <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={isSending || !input.trim()} data-testid="button-send-chat">
+                    {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </form>
+
+                <div className="flex gap-2 w-full">
+                  <Link href="/booking" onClick={() => setIsOpen(false)} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs text-primary border-primary hover:bg-primary hover:text-primary-foreground" data-testid="button-chat-booking">
+                      Đặt lịch ngay
+                    </Button>
+                  </Link>
+                  <Link href="/services" onClick={() => setIsOpen(false)} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs text-secondary-foreground border-secondary-foreground hover:bg-secondary hover:text-secondary-foreground" data-testid="button-chat-services">
+                      Xem dịch vụ
+                    </Button>
+                  </Link>
+                </div>
                 <Button
-                  variant={da_yeu_cau_ho_tro ? "ghost" : "outline"}
+                  variant={handoffStatus !== "idle" ? "ghost" : "outline"}
                   size="sm"
-                  className={`w-full text-xs gap-1.5 ${da_yeu_cau_ho_tro ? "text-muted-foreground cursor-default" : "text-orange-600 border-orange-300 hover:bg-orange-50 hover:border-orange-400"}`}
-                  onClick={xu_ly_yeu_cau_ho_tro}
-                  disabled={da_yeu_cau_ho_tro}
+                  className={`w-full text-xs gap-1.5 ${handoffStatus !== "idle" ? "text-muted-foreground cursor-default" : "text-orange-600 border-orange-300 hover:bg-orange-50 hover:border-orange-400"}`}
+                  onClick={() => handleHandoff(messages, { handoffReason: "user_requested" })}
+                  disabled={handoffStatus === "connecting"}
                   data-testid="button-chat-handoff"
                 >
                   <Headphones className="w-3.5 h-3.5" />
-                  {da_yeu_cau_ho_tro ? "Đang chờ API hỗ trợ..." : "Gặp nhân viên hỗ trợ"}
+                  {handoffStatus === "connecting"
+                    ? "Đang kết nối nhân viên..."
+                    : handoffStatus === "connected"
+                      ? "Đã chuyển sang HubSpot"
+                      : "Gặp nhân viên hỗ trợ"}
                 </Button>
               </CardFooter>
             </Card>
@@ -426,12 +489,12 @@ export default function ChatWidget() {
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={xu_ly_bat_tat}
+        onClick={handleToggle}
         className="w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center ml-auto"
         aria-label="Toggle chat"
         data-testid="button-toggle-chat"
       >
-        {trang_thai_mo ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+        {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </motion.button>
     </div>
   );
