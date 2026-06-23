@@ -10,8 +10,8 @@ interface User {
 interface AuthContextType {
   isLoggedIn: boolean;
   user: User | null;
-  login: (email: string, password?: string) => Promise<void>;
-  register: (data: { email: string; password?: string; fullName: string; phoneNumber: string }) => Promise<void>;
+  login: (email: string, password?: string, cfTurnstileResponse?: string) => Promise<void>;
+  register: (data: { email: string; password?: string; fullName: string; phoneNumber: string; cfTurnstileResponse?: string }) => Promise<void>;
   logout: () => void;
 }
 
@@ -33,9 +33,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const login = async (email: string, password?: string) => {
+  const login = async (email: string, password?: string, cfTurnstileResponse?: string) => {
     try {
-      const response = await api.post("/api/auth/login", { email, password });
+      const response = await api.post("/api/auth/login", { email, password, cfTurnstileResponse });
       
       const backendData = response.data?.data || {};
       const userData = {
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (data: { email: string; password?: string; fullName: string; phoneNumber: string }) => {
+  const register = async (data: { email: string; password?: string; fullName: string; phoneNumber: string; cfTurnstileResponse?: string }) => {
     try {
       const response = await api.post("/api/auth/register", data);
       

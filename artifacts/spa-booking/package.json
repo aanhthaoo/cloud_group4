@@ -75,6 +75,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.5.3",
     "axios": "^1.18.0"
   }
 }
