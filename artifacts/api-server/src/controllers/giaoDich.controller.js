@@ -276,92 +276,49 @@ const xacNhanThanhToan = async (req, res) => {
 // 4. API GET: Lấy lịch sử đặt hẹn
 const layLichSuDatHen = async (req, res) => {
     try {
-        const url_goc = "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/";
+        const { uid } = req.query;
+        if (!uid) {
+            return res.status(400).json({ loi: "Thiếu thông tin người dùng (uid)" });
+        }
 
-        // Lấy đồng thời danh sách Deal, cấu hình Fields và kho Sản phẩm
-        const [phan_hoi_deals, phan_hoi_fields, phan_hoi_san_pham] = await Promise.all([
-            axios.get(`${url_goc}crm.deal.list`, {
-                params: {
-                    select: ["ID", "TITLE", "STAGE_ID", "OPPORTUNITY", "DATE_CREATE", "UF_CRM_1781780490460", "UF_CRM_1782201826"],
-                    order: { "ID": "DESC" }
-                }
-            }),
-            axios.get(url_goc + "crm.deal.fields"),
-            axios.get(url_goc + "crm.product.list")
-        ]);
+        // 1. Lấy thông tin user từ Firestore để lấy điểm tích lũy
+        const userDoc = await db.collection('users').doc(uid).get();
+        let tong_diem = 0;
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            tong_diem = userData.loyalty?.points || 0;
+        }
 
-        const danh_sach_deal = phan_hoi_deals.data.result || [];
-        const kho_san_pham = phan_hoi_san_pham.data.result || [];
-
-        // Tạo bảng ánh xạ ID KTV -> Tên thật từ Bitrix
-        const truong_dat_lich_f = phan_hoi_fields.data.result['UF_CRM_1781780490460'];
-        let cai_dat = truong_dat_lich_f?.settings || truong_dat_lich_f?.SETTINGS || {};
-        if (typeof cai_dat === 'string') cai_dat = JSON.parse(cai_dat);
-
-        const map_ktv = {};
-        (cai_dat.SELECTED_RESOURCES || []).forEach(ktv => {
-            map_ktv[String(ktv.id)] = (ktv.title || ktv.NAME || "").trim();
-        });
+        // 2. Lấy lịch sử đặt hẹn từ booking_payments theo uid
+        const bookingsSnapshot = await db.collection('booking_payments')
+            .where('uid', '==', uid)
+            .get();
 
         const lich_sap_toi = [];
         const lich_su_dich_vu = [];
-        let tong_diem = 0;
         const now = new Date();
 
-        danh_sach_deal.forEach(deal => {
-            const trang_thai = String(deal.STAGE_ID).toUpperCase();
-            const deal_title = String(deal.TITLE || "");
+        // Chuyển kết quả sang mảng để sort (vì Firestore có thể yêu cầu index nếu order kết hợp where)
+        const bookings = [];
+        bookingsSnapshot.forEach(doc => bookings.push({ id: doc.id, ...doc.data() }));
+        
+        // Sắp xếp giảm dần theo thời gian KHÁCH ĐẶT (appointmentDate + appointmentTime) thay vì thời gian TẠO BOOKING (createdAt)
+        bookings.sort((a, b) => {
+            const timeA = new Date(`${a.appointmentDate || '1970-01-01'}T${a.appointmentTime || '00:00'}:00+07:00`).getTime();
+            const timeB = new Date(`${b.appointmentDate || '1970-01-01'}T${b.appointmentTime || '00:00'}:00+07:00`).getTime();
+            return timeB - timeA;
+        });
 
-            let du_lieu_lich = {};
-            try {
-                const raw = deal.UF_CRM_1781780490460;
-                if (raw) {
-                    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-                    // Bitrix field trả về có thể là mảng JSON string
-                    du_lieu_lich = Array.isArray(parsed) ? (typeof parsed[0] === 'string' ? JSON.parse(parsed[0]) : parsed[0]) : parsed;
-                }
-            } catch (e) { }
-            du_lieu_lich = du_lieu_lich || {};
-
-            // FIX TÊN KTV THÔNG MINH:
-            let ten_ktv = "Chuyên viên";
-
-            // Cách 1: Ưu tiên tách từ Tiêu đề Deal (Giải pháp chắc chắn 100% cho deal mới)
-            if (deal_title.includes("| KTV:")) {
-                ten_ktv = deal_title.split("| KTV:")[1].trim();
-            } else {
-                // Cách 2: Lấy từ mảng resources trong booking field (Dự phòng cho deal cũ)
-                const res_data = du_lieu_lich.resources || du_lieu_lich.RESOURCES;
-                if (res_data) {
-                    const items = Array.isArray(res_data) ? res_data : [res_data];
-                    const item = items[0];
-                    if (item) {
-                        const rid = String(item.id || item.ID);
-                        ten_ktv = map_ktv[rid] || item.title || item.TITLE || item.name || item.NAME || "Chuyên viên";
-                    }
-                }
-            }
-
-            // Xử lý Dịch vụ
-            let ten_dv_raw = "Dịch vụ";
-            if (deal_title.includes("Booking - ")) {
-                ten_dv_raw = deal_title.split("|")[0].replace("Booking - ", "").trim();
-            } else {
-                ten_dv_raw = (du_lieu_lich.service_name || du_lieu_lich.SERVICE_NAME || "Dịch vụ").trim();
-            }
-
-            // Tính giá gốc (Giữ nguyên logic đã chạy đúng)
-            const sp = kho_san_pham.find(s => s.NAME.trim().toLowerCase() === ten_dv_raw.toLowerCase());
-            const gia_goc = sp ? Math.round(parseFloat(sp.PRICE)) : (deal.OPPORTUNITY ? Math.round(parseFloat(deal.OPPORTUNITY) / 0.3) : 0);
-
-            // Xử lý thời gian
-            const thoi_gian_raw = du_lieu_lich.date_start || du_lieu_lich.DATE_START || deal.UF_CRM_1782201826 || "";
-            let hien_thi_ngay = "--/--/----";
-            let hien_thi_gio = "--:--";
+        bookings.forEach(booking => {
+            let hien_thi_ngay = booking.appointmentDate || "--/--/----";
+            let hien_thi_gio = booking.appointmentTime || "--:--";
             let compare_date = null;
 
-            if (thoi_gian_raw) {
-                compare_date = new Date(String(thoi_gian_raw).replace(' ', 'T'));
+            if (booking.appointmentDate && booking.appointmentTime) {
+                // Định dạng ISO: YYYY-MM-DDTHH:mm:00+07:00
+                const rawDate = `${booking.appointmentDate}T${booking.appointmentTime}:00+07:00`;
+                compare_date = new Date(rawDate);
+                
                 if (!isNaN(compare_date.getTime())) {
                     hien_thi_ngay = compare_date.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
                     hien_thi_gio = compare_date.toLocaleTimeString('vi-VN', {
@@ -374,29 +331,29 @@ const layLichSuDatHen = async (req, res) => {
             }
 
             const item = {
-                id: deal.ID,
-                ma_don: `SPA-${deal.ID}`,
-                ten_dich_vu: ten_dv_raw,
-                ten_ktv: ten_ktv,
+                id: booking.dealId || booking.id,
+                ma_don: `SPA-${booking.dealId || booking.id}`,
+                ten_dich_vu: booking.serviceName || "Dịch vụ",
+                ten_ktv: booking.technicianName || "Chuyên viên",
                 ngay: hien_thi_ngay,
                 gio: hien_thi_gio,
-                gia: gia_goc
+                gia: booking.totalAmount || booking.depositAmount || 0,
             };
 
             const is_future = compare_date ? compare_date > now : false;
-            if ((trang_thai.includes("PREPARATION") || trang_thai.includes("PREPAYMENT_INVOICE")) && is_future) {
-                item.trang_thai_hien_thi = trang_thai.includes("PREPAYMENT_INVOICE") ? "Đã xuất hoá đơn" : "Đã xác nhận";
+
+            if (is_future && booking.status !== 'cancelled') {
+                item.trang_thai_hien_thi = booking.status === 'invoice_success' ? "Đã xác nhận" : "Chờ xác nhận";
                 lich_sap_toi.push(item);
-            } else if ((compare_date && !is_future) || trang_thai.includes("WON")) {
-                item.trang_thai_hien_thi = trang_thai.includes("WON") ? "Hoàn thành" : "Đã sử dụng";
+            } else if (!is_future && booking.status !== 'cancelled') {
+                item.trang_thai_hien_thi = "Hoàn thành";
                 lich_su_dich_vu.push(item);
-                if (trang_thai.includes("WON")) tong_diem += Math.floor(gia_goc / 10000);
             }
         });
 
         return res.status(200).json({ lich_sap_toi, lich_su_dich_vu, tong_diem });
     } catch (loi) {
-        console.error("Lỗi layLichSuDatHen:", loi);
+        console.error("Lỗi layLichSuDatHen (Firestore):", loi);
         return res.status(500).json({ loi: "Lỗi hệ thống" });
     }
 };

@@ -48,19 +48,26 @@ export default function Profile() {
                 <span>{user.phone}</span>
               </div>
               <Badge className="bg-amber-100 text-amber-700 border-amber-200 border mt-1 gap-1">
-                <Crown className="w-3 h-3" /> Thông tin hạng đang chờ API
+                <Crown className="w-3 h-3" /> Hạng: {(user as any)?.loyalty?.tier || "Thành viên"}
               </Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-primary/10">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground" data-testid="khung-ho-so-nguoi-dung">
-              Các chỉ số và lịch sử dịch vụ đang chờ tích hợp API.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="shadow-sm border-primary/10">
+            <CardContent className="p-4 text-center">
+              <p className="text-sm text-muted-foreground font-medium mb-1">Điểm hiện tại</p>
+              <p className="text-2xl font-bold text-primary">{(user as any)?.loyalty?.points || 0}</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-primary/10">
+            <CardContent className="p-4 text-center">
+              <p className="text-sm text-muted-foreground font-medium mb-1">Tổng chi tiêu</p>
+              <p className="text-xl font-bold text-gray-800">{((user as any)?.loyalty?.totalSpent || 0).toLocaleString()}đ</p>
+            </CardContent>
+          </Card>
+        </div>
 
         <Button
           variant="outline"

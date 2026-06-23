@@ -4,8 +4,10 @@ import api from "@/lib/axios";
 import * as ThuVienIcon from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function BookingHistory() {
+  const { user } = useAuth();
   const [data, setData] = useState<{ lich_sap_toi: any[], lich_su_dich_vu: any[], tong_diem: number }>({
     lich_sap_toi: [],
     lich_su_dich_vu: [],
@@ -16,8 +18,9 @@ export default function BookingHistory() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user?.uid) return;
       try {
-        const response = await api.get("/api/lich-su-dat-hen");
+        const response = await api.get(`/api/lich-su-dat-hen?uid=${user.uid}`);
         setData(response.data);
       } catch (error) {
         console.error("Lỗi tải lịch sử đặt hẹn:", error);
@@ -26,7 +29,7 @@ export default function BookingHistory() {
       }
     };
     fetchData();
-  }, []);
+  }, [user?.uid]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
