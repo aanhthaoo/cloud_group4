@@ -9,14 +9,19 @@ function calculatePoints(amount) {
   return Math.floor(Number(amount || 0) / 10000);
 }
 
-function calculateTier(totalSpent) {
-  const spent = Number(totalSpent || 0);
+function calculateTier(lifetimePoints) {
+  const points = Number(lifetimePoints || 0);
 
-  if (spent >= 10000000) return "Diamond";
-  if (spent >= 5000000) return "Gold";
-  if (spent >= 2000000) return "Silver";
+  if (points >= 5000) return "VIP";
+  if (points >= 1000) return "Gold";
 
   return "Member";
+}
+
+function getTierBenefit(tier) {
+  if (tier === "VIP") return { discountPercent: 10 };
+  if (tier === "Gold") return { discountPercent: 5 };
+  return { discountPercent: 0 };
 }
 
 async function ensureBitrixContact(userRef, user) {
@@ -45,12 +50,25 @@ async function ensureBitrixContact(userRef, user) {
   return newContactId ? String(newContactId) : null;
 }
 
-async function applyLoyaltyAfterPayment(uid, paidAmount) {
+async function applyLoyaltyAfterPayment(uid, paidAmount, options = {}) {
   const userRef = db.collection("users").doc(uid);
+  const eventId = options.eventId ? String(options.eventId) : null;
+  const eventRef = eventId ? db.collection("loyalty_events").doc(eventId) : null;
 
   let result = null;
 
   await db.runTransaction(async (transaction) => {
+    if (eventRef) {
+      const eventDoc = await transaction.get(eventRef);
+      if (eventDoc.exists) {
+        result = {
+          ...eventDoc.data().result,
+          alreadyProcessed: true,
+        };
+        return;
+      }
+    }
+
     const userDoc = await transaction.get(userRef);
 
     if (!userDoc.exists) {
@@ -62,21 +80,29 @@ async function applyLoyaltyAfterPayment(uid, paidAmount) {
     const oldLoyalty = user.loyalty || {
       tier: "Member",
       points: 0,
+      lifetimePoints: 0,
       totalSpent: 0,
+      discountPercent: 0,
     };
 
     const pointsAdded = calculatePoints(paidAmount);
     const newTotalSpent =
       Number(oldLoyalty.totalSpent || 0) + Number(paidAmount || 0);
-    const newPoints = Number(oldLoyalty.points || 0) + pointsAdded;
+    const oldLifetimePoints = Number(
+      oldLoyalty.lifetimePoints ?? oldLoyalty.points ?? 0
+    );
+    const newLifetimePoints = oldLifetimePoints + pointsAdded;
 
     const oldTier = oldLoyalty.tier || "Member";
-    const newTier = calculateTier(newTotalSpent);
+    const newTier = calculateTier(newLifetimePoints);
 
     const newLoyalty = {
-      points: newPoints,
+      points: newLifetimePoints,
+      lifetimePoints: newLifetimePoints,
       totalSpent: newTotalSpent,
       tier: newTier,
+      discountPercent: getTierBenefit(newTier).discountPercent,
+      updatedAt: new Date(),
     };
 
     transaction.update(userRef, {
@@ -94,8 +120,28 @@ async function applyLoyaltyAfterPayment(uid, paidAmount) {
       pointsAdded,
       loyalty: newLoyalty,
       isTierUpgraded: oldTier !== newTier,
+      alreadyProcessed: false,
+      source: options.source || null,
+      sourceId: options.sourceId || null,
     };
+
+    if (eventRef) {
+      transaction.set(eventRef, {
+        eventId,
+        uid,
+        paidAmount: Number(paidAmount || 0),
+        source: options.source || null,
+        sourceId: options.sourceId || null,
+        payload: options.payload || null,
+        result,
+        createdAt: new Date(),
+      });
+    }
   });
+
+  if (result?.alreadyProcessed) {
+    return result;
+  }
 
   const userSnap = await userRef.get();
 
@@ -104,14 +150,23 @@ async function applyLoyaltyAfterPayment(uid, paidAmount) {
     ...userSnap.data(),
   };
 
-  const bitrixContactId = await ensureBitrixContact(userRef, latestUser);
+  let bitrixContactId = null;
+  let bitrixSyncError = null;
 
-  if (bitrixContactId) {
-    await updateContactLoyalty(bitrixContactId, result.loyalty);
+  try {
+    bitrixContactId = await ensureBitrixContact(userRef, latestUser);
+
+    if (bitrixContactId) {
+      await updateContactLoyalty(bitrixContactId, result.loyalty);
+    }
+  } catch (error) {
+    bitrixSyncError = error.message;
+    console.error("[LOYALTY] Bitrix sync failed:", error.message);
   }
 
   return {
     ...result,
+    bitrixSyncError,
     user: {
       ...latestUser,
       bitrixContactId,
@@ -123,4 +178,5 @@ module.exports = {
   applyLoyaltyAfterPayment,
   calculatePoints,
   calculateTier,
+  getTierBenefit,
 };

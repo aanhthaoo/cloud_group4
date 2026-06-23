@@ -1,109 +1,135 @@
-const BITRIX_WEBHOOK_URL = process.env.BITRIX_WEBHOOK_URL?.replace(/\/$/, "");
+const HUBSPOT_ACCESS_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
+const HUBSPOT_SINGLE_SEND_URL =
+  "https://api.hubapi.com/marketing/v3/transactional/single-email/send";
 
-async function bitrixCall(method, payload = {}) {
-  if (!BITRIX_WEBHOOK_URL) {
-    console.log(`[MOCK BITRIX] Bỏ qua gọi API: ${method}`);
-    return null;
+function formatVnd(amount) {
+  return Number(amount || 0).toLocaleString("vi-VN") + " VND";
+}
+
+function getCustomerEmail(user, fallbackPayload = {}) {
+  return (
+    user?.email ||
+    user?.customerEmail ||
+    fallbackPayload.customerEmail ||
+    fallbackPayload.email ||
+    null
+  );
+}
+
+async function sendTransactionalEmail({ emailId, to, customProperties, label }) {
+  if (!to) {
+    console.log(`[HUBSPOT EMAIL] Skip ${label}: missing recipient email`);
+    return { skipped: true, reason: "missing_recipient" };
   }
 
-  const url = `${BITRIX_WEBHOOK_URL}/${method}.json`;
+  if (!HUBSPOT_ACCESS_TOKEN || !emailId) {
+    console.log(
+      `[MOCK HUBSPOT EMAIL] ${label} -> ${to}`,
+      JSON.stringify(customProperties, null, 2)
+    );
+    return { mocked: true };
+  }
 
-  const response = await fetch(url, {
+  const response = await fetch(HUBSPOT_SINGLE_SEND_URL, {
     method: "POST",
     headers: {
+      Authorization: `Bearer ${HUBSPOT_ACCESS_TOKEN}`,
       "Content-Type": "application/json",
-      Accept: "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      emailId: Number(emailId),
+      message: { to },
+      customProperties,
+    }),
   });
 
   const data = await response.json().catch(() => ({}));
 
-  if (!response.ok || data.error) {
+  if (!response.ok) {
     throw new Error(
-      data.error_description ||
-        data.error ||
-        `Bitrix API error: ${method}`
+      data.message || data.error || `HubSpot email failed: ${label}`
     );
   }
 
-  return data.result;
+  return data;
 }
 
-async function findContactByEmail(email) {
-  if (!email) return null;
+async function sendAppointmentConfirmation(user, bookingOrPayload = {}) {
+  const to = getCustomerEmail(user, bookingOrPayload);
 
-  const result = await bitrixCall("crm.contact.list", {
-    filter: {
-      EMAIL: email,
+  return sendTransactionalEmail({
+    emailId: process.env.HUBSPOT_APPOINTMENT_EMAIL_ID,
+    to,
+    label: "appointment_confirmation",
+    customProperties: {
+      customer_name:
+        user?.fullName ||
+        user?.name ||
+        bookingOrPayload.customerName ||
+        "Khach hang",
+      service_name:
+        bookingOrPayload.serviceName || bookingOrPayload.ten_dich_vu || "",
+      technician_name:
+        bookingOrPayload.technicianName || bookingOrPayload.ten_ktv || "",
+      appointment_date:
+        bookingOrPayload.appointmentDate || bookingOrPayload.ngay_dat || "",
+      appointment_time:
+        bookingOrPayload.appointmentTime || bookingOrPayload.gio_dat || "",
     },
-    select: [
-      "ID",
-      "NAME",
-      "LAST_NAME",
-      "EMAIL",
-      process.env.BITRIX_FIELD_POINTS || "UF_CRM_LOYALTY_POINTS",
-      process.env.BITRIX_FIELD_TIER || "UF_CRM_LOYALTY_TIER",
-      process.env.BITRIX_FIELD_TOTAL_SPENT || "UF_CRM_TOTAL_SPENT",
-    ],
   });
-
-  if (!Array.isArray(result) || result.length === 0) return null;
-
-  return result[0];
 }
 
-async function createContactForUser(user) {
-  const fields = {
-    NAME: user.fullName || user.name || user.email || "Khách hàng",
-    EMAIL: user.email
-      ? [
-          {
-            VALUE: user.email,
-            VALUE_TYPE: "WORK",
-          },
-        ]
-      : [],
-    PHONE: user.phoneNumber || user.phone
-      ? [
-          {
-            VALUE: user.phoneNumber || user.phone,
-            VALUE_TYPE: "WORK",
-          },
-        ]
-      : [],
-  };
+async function sendPaymentInvoice(user, invoicePayload = {}) {
+  const to = getCustomerEmail(user, invoicePayload);
 
-  const newContactId = await bitrixCall("crm.contact.add", {
-    fields,
+  return sendTransactionalEmail({
+    emailId: process.env.HUBSPOT_INVOICE_EMAIL_ID,
+    to,
+    label: "payment_invoice",
+    customProperties: {
+      customer_name:
+        user?.fullName ||
+        user?.name ||
+        invoicePayload.customerName ||
+        "Khach hang",
+      invoice_id:
+        invoicePayload.invoiceId ||
+        invoicePayload.bitrixInvoiceId ||
+        invoicePayload.dealId ||
+        "",
+      service_name:
+        invoicePayload.serviceName || invoicePayload.ten_dich_vu || "",
+      total_amount: formatVnd(invoicePayload.totalAmount),
+      paid_amount: formatVnd(invoicePayload.paidAmount),
+      points_added: invoicePayload.pointsAdded || 0,
+      loyalty_points:
+        invoicePayload.loyalty?.lifetimePoints ||
+        invoicePayload.loyalty?.points ||
+        0,
+      loyalty_tier: invoicePayload.loyalty?.tier || "Member",
+    },
   });
-
-  return newContactId;
 }
 
-async function updateContactLoyalty(contactId, loyalty) {
-  if (!contactId) return null;
+async function sendTierUpgradeEmail(user, oldTier, newTier, loyalty = {}) {
+  const to = getCustomerEmail(user);
 
-  const pointsField = process.env.BITRIX_FIELD_POINTS || "UF_CRM_LOYALTY_POINTS";
-  const tierField = process.env.BITRIX_FIELD_TIER || "UF_CRM_LOYALTY_TIER";
-  const totalSpentField =
-    process.env.BITRIX_FIELD_TOTAL_SPENT || "UF_CRM_TOTAL_SPENT";
-
-  const fields = {
-    [pointsField]: loyalty.points,
-    [tierField]: loyalty.tier,
-    [totalSpentField]: loyalty.totalSpent,
-  };
-
-  return bitrixCall("crm.contact.update", {
-    id: Number(contactId),
-    fields,
+  return sendTransactionalEmail({
+    emailId: process.env.HUBSPOT_TIER_UPGRADE_EMAIL_ID,
+    to,
+    label: "tier_upgrade",
+    customProperties: {
+      customer_name: user?.fullName || user?.name || "Khach hang",
+      old_tier: oldTier,
+      new_tier: newTier,
+      loyalty_points: loyalty.lifetimePoints || loyalty.points || 0,
+      discount_percent: loyalty.discountPercent || 0,
+    },
   });
 }
 
 module.exports = {
-  bitrixCall,
-  findContactByEmail,
-  createContactForUser,
-  updateContactLoyalty,
+  sendAppointmentConfirmation,
+  sendPaymentInvoice,
+  sendTierUpgradeEmail,
 };
