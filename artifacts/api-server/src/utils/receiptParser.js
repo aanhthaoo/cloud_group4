@@ -83,16 +83,44 @@ function extractAmount(text) {
 
 const CONTENT_KEYWORDS =
   /(nội dung|noi dung|memo|content|message|diễn giải|dien giai|lời nhắn|loi nhan|tin nhắn|tin nhan)/i;
+// Mở rộng danh sách từ khóa rác để lọc bỏ triệt để các dòng về phí
+const CONTENT_SKIP_KEYWORDS = /(phí chuyển tiền|phi chuyen tien|phí giao dịch|phi giao dich|phí dịch vụ|phi dich vu|người chuyển trả|nguoi chuyen tra|mã giao dịch|ma giao dich|phi chuyen|loại phí|loai phi)/i;
 
 function extractContent(text) {
+  // 1. CHIẾN THUẬT ƯU TIÊN TUYỆT ĐỐI: Quét toàn văn tìm mã DH (tránh bị lệch dòng)
+  // Tìm mã dạng DH95 hoặc DH 95 ở bất cứ đâu
+  const dhMatch = text.match(/DH\s*(\d+)/i);
+  if (dhMatch) {
+    return `LOTUSGLOW DH${dhMatch[1]}`;
+  }
+
+  // 2. CHIẾN THUẬT DỰ PHÒNG: Tìm theo nhãn và lọc nhiễu
   const lines = getLines(text);
   for (let i = 0; i < lines.length; i++) {
     if (CONTENT_KEYWORDS.test(lines[i])) {
-      const afterColon = lines[i].split(/[:：]/).slice(1).join(':').trim();
-      if (afterColon) return cleanValue(afterColon);
-      if (lines[i + 1]) return cleanValue(lines[i + 1]);
+      let parts = lines[i].split(/[:：]/);
+      let candidate = parts.length > 1 ? parts.slice(1).join(':').trim() : "";
+
+      if (!candidate && lines[i + 1]) {
+        candidate = lines[i + 1];
+      }
+
+      if (candidate) {
+        const cleaned = cleanValue(candidate);
+        if (cleaned) {
+          const normalized = removeAccents(cleaned).toLowerCase();
+          // Chỉ trả về nếu không phải là dòng về Phí
+          if (!CONTENT_SKIP_KEYWORDS.test(normalized) && normalized.length >= 3) {
+            return cleaned;
+          }
+        }
+      }
     }
   }
+
+  // 3. Fallback: Tìm từ khóa LotusGlow
+  if (/LOTUS\s*GLOW/i.test(text)) return "LOTUSGLOW";
+
   return null;
 }
 
@@ -167,7 +195,7 @@ function extractTransferDate(text) {
           }
         }
       }
-      if (detectedDate && detectedTime) break;
+      if (detectedDate) break;
     }
   }
 

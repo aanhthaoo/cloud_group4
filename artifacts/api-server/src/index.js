@@ -13,9 +13,11 @@ app.use(express.json());
 const indexRoutes = require('./routes/index.routes.js');
 const paymentRoutes = require('./routes/payment.routes.js');
 const chatRoutes = require('./routes/chat.routes.js');
+const bookingRoutes = require('./routes/booking.routes.js'); // Chống double-booking
 app.use('/', indexRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api', chatRoutes);
+app.use('/api/bookings', bookingRoutes); // GET /unavailable-slots | POST /create
 
 
 // Route gốc
