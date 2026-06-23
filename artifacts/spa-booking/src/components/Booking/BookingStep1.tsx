@@ -62,7 +62,7 @@ export default function BookingStep1() {
   useEffect(() => {
     const taiDuLieu = async () => {
       try {
-        const phan_hoi = await axios.get("/api/thong-tin-dat-lich");
+        const phan_hoi = await api.get("/api/thong-tin-dat-lich");
         setDanhSachDichVu(phan_hoi.data.danh_sach_dich_vu);
         setDanhSachKtv(phan_hoi.data.danh_sach_ktv);
         // Không còn dùng danh_sach_lich_ban tĩnh từ đây nữa
@@ -166,7 +166,7 @@ export default function BookingStep1() {
       setThoiGianConLai(secondsLeft); // khởi động đồng hồ
 
       // BƯỚC 2: Slot đã giữ xong → tiến hành tạo giao dịch & QR
-      const phan_hoi = await axios.post("/api/chot-lich-hen", {
+      const phan_hoi = await api.post("/api/chot-lich-hen", {
         ten_dich_vu: dich_vu_da_chon.ten,
         gia_tien: dich_vu_da_chon.gia,
         ten_ktv: ktv_da_chon.ten,
@@ -290,7 +290,7 @@ export default function BookingStep1() {
     setIsFinalizing(true);
     try {
       if (ma_giao_dich) {
-        const phan_hoi = await axios.post('/api/xac-nhan-thanh-toan', { id_giao_dich: ma_giao_dich });
+        const phan_hoi = await api.post('/api/xac-nhan-thanh-toan', { id_giao_dich: ma_giao_dich });
         if (phan_hoi.data.thanh_cong) {
           setHienThongBaoThanhCong(true);
         } else {
