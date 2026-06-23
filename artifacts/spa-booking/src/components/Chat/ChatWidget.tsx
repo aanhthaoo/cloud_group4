@@ -118,17 +118,24 @@ function loadHubSpotWidget() {
       return;
     }
 
-    if (window.HubSpotConversations?.widget) {
+    // Check that widget AND open() are both ready (not just the widget object)
+    if (window.HubSpotConversations?.widget?.open) {
       finish(true);
       return;
     }
 
+    // If widget object exists but open() not yet ready, wait for it
+    if (window.HubSpotConversations?.widget) {
+      waitForHubSpotWidget().then(finish);
+      return;
+    }
+
     window.hsConversationsOnReady = window.hsConversationsOnReady || [];
-    window.hsConversationsOnReady.push(() => finish(true));
+    window.hsConversationsOnReady.push(() => waitForHubSpotWidget().then(finish));
 
     const existingScript = document.getElementById("hs-script-loader");
     if (existingScript) {
-      existingScript.addEventListener("load", () => finish(true), { once: true });
+      existingScript.addEventListener("load", () => waitForHubSpotWidget().then(finish), { once: true });
       waitForHubSpotWidget().then(finish);
       return;
     }
@@ -144,21 +151,46 @@ function loadHubSpotWidget() {
   });
 }
 
-async function openHubSpotChat() {
-  const loaded = await loadHubSpotWidget();
+function isHubSpotWidgetVisible() {
+  // HubSpot injects an iframe with id="hubspot-messages-iframe-container" when the chat opens
+  const container = document.getElementById("hubspot-messages-iframe-container");
+  if (!container) return false;
+  const style = window.getComputedStyle(container);
+  return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+}
 
-  if (loaded && window.HubSpotConversations?.widget?.load) {
+async function openHubSpotChat() {
+  // First, trigger load() to make the widget visible if it was hidden
+  if (window.HubSpotConversations?.widget?.load) {
     window.HubSpotConversations.widget.load();
   }
 
-  if (loaded && window.HubSpotConversations?.widget?.open) {
-    window.HubSpotConversations.widget.open();
-    return true;
-  }
+  const ready = await loadHubSpotWidget();
 
-  if (hubSpotPortalId) {
-    window.location.hash = "hs-chat-open";
-    return true;
+  console.debug("[HubSpot] openHubSpotChat:", {
+    ready,
+    hasConversations: !!window.HubSpotConversations,
+    hasWidget: !!window.HubSpotConversations?.widget,
+    hasOpen: !!window.HubSpotConversations?.widget?.open,
+    portalId: hubSpotPortalId,
+  });
+
+  if (ready && window.HubSpotConversations?.widget?.open) {
+    window.HubSpotConversations.widget.open();
+
+    // Wait up to 1s to confirm the widget iframe actually appeared in DOM
+    const appeared = await new Promise<boolean>((resolve) => {
+      const deadline = Date.now() + 1000;
+      const check = () => {
+        if (isHubSpotWidgetVisible()) { resolve(true); return; }
+        if (Date.now() >= deadline) { resolve(false); return; }
+        setTimeout(check, 100);
+      };
+      check();
+    });
+
+    console.debug("[HubSpot] widget appeared in DOM:", appeared);
+    return appeared;
   }
 
   return false;
@@ -172,9 +204,28 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [handoffStatus, setHandoffStatus] = useState<HandoffStatus>("idle");
+  const [hubSpotVisible, setHubSpotVisible] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const sessionId = useMemo(getSessionId, []);
+
+  // Watch for HubSpot launcher button appearing/disappearing in DOM
+  useEffect(() => {
+    const HS_CONTAINER_ID = "hubspot-messages-iframe-container";
+
+    const checkVisibility = () => {
+      const el = document.getElementById(HS_CONTAINER_ID);
+      setHubSpotVisible(!!el);
+    };
+
+    // Initial check
+    checkVisibility();
+
+    const observer = new MutationObserver(checkVisibility);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -209,15 +260,20 @@ export default function ChatWidget() {
       const opened = await openHubSpotChat();
 
       if (!opened) {
-        appendSystemMessage("Chưa mở được HubSpot LiveChat. Kiểm tra VITE_HUBSPOT_PORTAL_ID, chatflow Published/On và Target All pages.");
-      } else if (handoffResponse.data.hubspotSaved) {
-        appendSystemMessage("Đã mở HubSpot LiveChat. Transcript đã được lưu vào HubSpot CRM để nhân viên tiếp tục tư vấn.");
+        // Widget didn't appear — keep AI chat open and show a helpful message
+        appendSystemMessage(
+          handoffResponse.data.hubspotSaved
+            ? "Transcript đã lưu vào HubSpot CRM. Cửa sổ chat nhân viên chưa mở được (có thể do trình duyệt chặn hoặc chatflow chưa target URL này). Vui lòng tải lại trang và thử lại."
+            : "Chưa thể mở cửa sổ chat nhân viên. Vui lòng thử lại sau hoặc liên hệ qua số hotline."
+        );
+        setHandoffStatus("idle");
       } else {
-        appendSystemMessage("Đã mở HubSpot LiveChat, nhưng transcript chưa lưu được vào HubSpot CRM. Bạn vẫn có thể gửi tin nhắn trong cửa sổ HubSpot để nhân viên nhận được.");
-      }
-
-      setHandoffStatus(opened ? "connected" : "idle");
-      if (opened) {
+        if (handoffResponse.data.hubspotSaved) {
+          appendSystemMessage("Đã chuyển sang HubSpot LiveChat. Transcript cuộc trò chuyện đã được lưu vào HubSpot CRM để nhân viên tiếp tục tư vấn.");
+        } else {
+          appendSystemMessage("Đã mở HubSpot LiveChat. Bạn có thể gửi tin nhắn trực tiếp cho nhân viên hỗ trợ.");
+        }
+        setHandoffStatus("connected");
         setIsOpen(false);
       }
     } catch (error) {
@@ -283,7 +339,13 @@ export default function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div
+      className="fixed right-6 z-50"
+      style={{
+        bottom: hubSpotVisible ? "88px" : "24px",
+        transition: "bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+      }}
+    >
       <AnimatePresence>
         {isOpen && (
           <motion.div
