@@ -2,7 +2,9 @@
   "agent": {
     "displayName": "Kich_Ban_Dat_Lich_New",
     "defaultLanguageCode": "vi",
-    "supportedLanguageCodes": ["en"],
+    "supportedLanguageCodes": [
+      "en"
+    ],
     "timeZone": "Asia/Ho_Chi_Minh",
     "description": "Kịch bản lễ tân ảo AI cho LotusGlow Spa: FAQ, trắc nghiệm tư vấn dịch vụ, đặt lịch và chuyển tiếp nhân viên."
   },
@@ -19,45 +21,113 @@
       "entitiesVi": [
         {
           "value": "massage",
-          "synonyms": ["massage", "massage thư giãn", "body", "trị liệu", "đau vai", "đau lưng", "thư giãn"]
+          "synonyms": [
+            "massage",
+            "massage thư giãn",
+            "body",
+            "trị liệu",
+            "đau vai",
+            "đau lưng",
+            "thư giãn"
+          ]
         },
         {
           "value": "facial",
-          "synonyms": ["chăm sóc da", "da mặt", "facial", "làm sạch da", "cấp ẩm", "mụn", "da khô"]
+          "synonyms": [
+            "chăm sóc da",
+            "da mặt",
+            "facial",
+            "làm sạch da",
+            "cấp ẩm",
+            "mụn",
+            "da khô",
+            "da xỉn màu"
+          ]
         },
         {
           "value": "nails",
-          "synonyms": ["nail", "nails", "móng", "làm móng", "pedicure", "manicure"]
+          "synonyms": [
+            "nail",
+            "nails",
+            "móng",
+            "làm móng",
+            "pedicure",
+            "manicure"
+          ]
         },
         {
           "value": "waxing",
-          "synonyms": ["waxing", "tẩy lông", "triệt lông", "sáp"]
+          "synonyms": [
+            "waxing",
+            "tẩy lông",
+            "triệt lông",
+            "sáp"
+          ]
         },
         {
           "value": "bridal",
-          "synonyms": ["cô dâu", "gói cô dâu", "cưới", "ngày cưới", "sự kiện đặc biệt"]
+          "synonyms": [
+            "cô dâu",
+            "gói cô dâu",
+            "cưới",
+            "ngày cưới",
+            "sự kiện đặc biệt"
+          ]
         }
       ],
       "entitiesEn": [
         {
           "value": "massage",
-          "synonyms": ["massage", "relaxing massage", "body massage", "therapy", "shoulder pain", "back pain", "relax"]
+          "synonyms": [
+            "massage",
+            "relaxing massage",
+            "body massage",
+            "therapy",
+            "shoulder pain",
+            "back pain",
+            "relax"
+          ]
         },
         {
           "value": "facial",
-          "synonyms": ["facial", "skin care", "face care", "deep cleansing", "hydration", "acne", "dry skin"]
+          "synonyms": [
+            "facial",
+            "skin care",
+            "face care",
+            "deep cleansing",
+            "hydration",
+            "acne",
+            "dry skin",
+            "dull skin"
+          ]
         },
         {
           "value": "nails",
-          "synonyms": ["nail", "nails", "manicure", "pedicure", "nail care"]
+          "synonyms": [
+            "nail",
+            "nails",
+            "manicure",
+            "pedicure",
+            "nail care"
+          ]
         },
         {
           "value": "waxing",
-          "synonyms": ["waxing", "hair removal", "wax"]
+          "synonyms": [
+            "waxing",
+            "hair removal",
+            "wax"
+          ]
         },
         {
           "value": "bridal",
-          "synonyms": ["bridal", "bride package", "wedding", "wedding day", "special event"]
+          "synonyms": [
+            "bridal",
+            "bride package",
+            "wedding",
+            "wedding day",
+            "special event"
+          ]
         }
       ]
     },
@@ -66,29 +136,65 @@
       "entitiesVi": [
         {
           "value": "low",
-          "synonyms": ["dưới 300k", "dưới 300 nghìn", "rẻ", "tiết kiệm", "giá thấp"]
+          "synonyms": [
+            "dưới 300k",
+            "dưới 300 nghìn",
+            "rẻ",
+            "tiết kiệm",
+            "giá thấp"
+          ]
         },
         {
           "value": "medium",
-          "synonyms": ["300k đến 600k", "tầm trung", "vừa phải", "khoảng 500k", "bình dân"]
+          "synonyms": [
+            "300k đến 600k",
+            "tầm trung",
+            "vừa phải",
+            "khoảng 500k",
+            "bình dân"
+          ]
         },
         {
           "value": "high",
-          "synonyms": ["trên 600k", "cao cấp", "premium", "không quan trọng giá", "gói tốt nhất"]
+          "synonyms": [
+            "trên 600k",
+            "cao cấp",
+            "premium",
+            "không quan trọng giá",
+            "gói tốt nhất"
+          ]
         }
       ],
       "entitiesEn": [
         {
           "value": "low",
-          "synonyms": ["under 300k", "cheap", "budget", "low price", "affordable"]
+          "synonyms": [
+            "under 300k",
+            "cheap",
+            "budget",
+            "low price",
+            "affordable"
+          ]
         },
         {
           "value": "medium",
-          "synonyms": ["300k to 600k", "mid range", "moderate", "around 500k", "reasonable"]
+          "synonyms": [
+            "300k to 600k",
+            "mid range",
+            "moderate",
+            "around 500k",
+            "reasonable"
+          ]
         },
         {
           "value": "high",
-          "synonyms": ["over 600k", "premium", "high end", "best package", "price does not matter"]
+          "synonyms": [
+            "over 600k",
+            "premium",
+            "high end",
+            "best package",
+            "price does not matter"
+          ]
         }
       ]
     },
@@ -97,13 +203,27 @@
       "entitiesVi": [
         {
           "value": "human",
-          "synonyms": ["gặp nhân viên", "tư vấn viên", "người thật", "hỗ trợ trực tiếp", "gọi nhân viên", "nói chuyện với nhân viên"]
+          "synonyms": [
+            "gặp nhân viên",
+            "tư vấn viên",
+            "người thật",
+            "hỗ trợ trực tiếp",
+            "gọi nhân viên",
+            "nói chuyện với nhân viên"
+          ]
         }
       ],
       "entitiesEn": [
         {
           "value": "human",
-          "synonyms": ["staff", "human agent", "real person", "live support", "talk to staff", "consultant"]
+          "synonyms": [
+            "staff",
+            "human agent",
+            "real person",
+            "live support",
+            "talk to staff",
+            "consultant"
+          ]
         }
       ]
     }
@@ -160,6 +280,9 @@
         "Cho mình xin bảng giá",
         "Massage bao nhiêu tiền?",
         "Chăm sóc da giá bao nhiêu?",
+        "Nails giá bao nhiêu?",
+        "Waxing bao nhiêu tiền?",
+        "Gói cô dâu giá bao nhiêu?",
         "Có dịch vụ nào dưới 500k không?",
         "Giá dịch vụ hiện tại là bao nhiêu?"
       ],
@@ -167,14 +290,17 @@
         "Can I see the price list?",
         "How much is a massage?",
         "How much does facial care cost?",
+        "How much is nails and pedicure?",
+        "How much is waxing?",
+        "How much is the bridal package?",
         "Do you have any service under 500k?",
         "What are the current service prices?"
       ],
       "responsesVi": [
-        "Mình sẽ kiểm tra danh sách dịch vụ và bảng giá hiện tại cho bạn."
+        "Bảng giá hiện tại của LotusGlow gồm: Massage thư giãn 90 phút - 450,000đ; Chăm sóc da mặt 60 phút - 380,000đ; Nails & Pedicure 75 phút - 280,000đ; Waxing 45 phút - 200,000đ; Gói Cô Dâu 180 phút - 1,200,000đ. Bạn muốn mình gợi ý dịch vụ phù hợp hay kiểm tra lịch trống?"
       ],
       "responsesEn": [
-        "I will check the current service list and prices for you."
+        "The current LotusGlow price list is: Relaxing massage 90 minutes - 450,000 VND; Facial care 60 minutes - 380,000 VND; Nails & Pedicure 75 minutes - 280,000 VND; Waxing 45 minutes - 200,000 VND; Bridal Package 180 minutes - 1,200,000 VND. Would you like a recommendation or available slot check?"
       ]
     },
     {
@@ -209,7 +335,7 @@
         "My budget is around 500k, what should I choose?"
       ],
       "responsesVi": [
-        "Được rồi. Mình sẽ hỏi nhanh vài câu để gợi ý dịch vụ phù hợp. Bạn đang muốn thư giãn cơ thể, chăm sóc da, làm móng hay chuẩn bị cho sự kiện đặc biệt?"
+        "Được rồi. Mình sẽ hỏi nhanh vài câu để gợi ý dịch vụ phù hợp. Bạn đang muốn thư giãn cơ thể, chăm sóc da, làm móng, waxing hay chuẩn bị cho sự kiện đặc biệt?"
       ],
       "responsesEn": [
         "Sure. I will ask a few quick questions to recommend a suitable service. Are you looking for body relaxation, skin care, nail care, or preparation for a special event?"
@@ -226,26 +352,94 @@
         }
       ],
       "trainingPhrasesVi": [
-        "Da mình khô thì nên làm gì?",
         "Mình muốn chăm sóc da mặt",
-        "Da mình hơi xỉn màu",
-        "Mình cần cấp ẩm cho da",
-        "Mặt mình cần làm sạch sâu",
-        "Tư vấn chăm sóc da cho mình"
+        "Tư vấn chăm sóc da cho mình",
+        "Mình muốn làm facial",
+        "Mình muốn da khỏe hơn",
+        "Mình muốn làm sạch và phục hồi da"
       ],
       "trainingPhrasesEn": [
-        "What should I do for dry skin?",
         "I want facial care",
-        "My skin looks dull",
-        "I need skin hydration",
-        "My face needs deep cleansing",
-        "Please advise me about skin care"
+        "Please advise me about skin care",
+        "I want a facial",
+        "I want healthier skin",
+        "I want skin cleansing and recovery"
       ],
       "responsesVi": [
-        "Nếu bạn muốn chăm sóc da, mình sẽ ưu tiên các dịch vụ làm sạch sâu, cấp ẩm và phục hồi da. Bạn có đang gặp vấn đề mụn, da khô hay da xỉn màu không?"
+        "Nếu bạn muốn chăm sóc da, mình sẽ ưu tiên các dịch vụ làm sạch sâu, cấp ẩm và phục hồi da. Bạn đang gặp vấn đề mụn, da khô hay da xỉn màu?"
       ],
       "responsesEn": [
         "If you want skin care, I will prioritize deep cleansing, hydration, and recovery services. Are you dealing with acne, dry skin, or dull skin?"
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 3A - DaKho",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "da khô",
+        "Da mình khô",
+        "Da mình bị khô",
+        "Mình bị khô da",
+        "Da mình thiếu ẩm",
+        "Mình cần cấp ẩm cho da",
+        "Da mình khô thì nên làm gì?",
+        "Da khô thì chọn dịch vụ nào?"
+      ],
+      "trainingPhrasesEn": [
+        "dry skin",
+        "My skin is dry",
+        "I have dry skin",
+        "My skin lacks moisture",
+        "I need skin hydration",
+        "What should I do for dry skin?",
+        "Which service should I choose for dry skin?"
+      ],
+      "responsesVi": [
+        "Với tình trạng da khô hoặc thiếu ẩm, mình gợi ý dịch vụ chăm sóc da cấp ẩm và phục hồi hàng rào bảo vệ da. Bạn có thể chọn nhóm facial cấp ẩm, làm sạch dịu nhẹ và phục hồi da. Bạn muốn mình kiểm tra dịch vụ phù hợp hoặc lịch trống cho bạn không?"
+      ],
+      "responsesEn": [
+        "For dry or dehydrated skin, I recommend a hydrating facial and skin barrier recovery service with gentle cleansing. Would you like me to check suitable services or available slots for you?"
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 3B - DaXinMau",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "da xỉn màu",
+        "Da mình xỉn màu",
+        "Da mình hơi xỉn",
+        "Da mình không đều màu",
+        "Mình muốn da sáng hơn",
+        "Mặt mình bị xỉn màu",
+        "Da mình thiếu sức sống"
+      ],
+      "trainingPhrasesEn": [
+        "dull skin",
+        "My skin looks dull",
+        "My skin tone is uneven",
+        "I want brighter skin",
+        "My face looks dull",
+        "My skin looks tired"
+      ],
+      "responsesVi": [
+        "Với da xỉn màu hoặc không đều màu, mình gợi ý nhóm chăm sóc da làm sạch sâu, tẩy tế bào chết dịu nhẹ và dưỡng sáng phục hồi. Bạn muốn mình kiểm tra dịch vụ phù hợp trong danh mục hiện tại không?"
+      ],
+      "responsesEn": [
+        "For dull or uneven skin, I recommend deep cleansing, gentle exfoliation, and brightening recovery care. Would you like me to check suitable services from the current catalog?"
       ]
     },
     {
@@ -259,6 +453,8 @@
         }
       ],
       "trainingPhrasesVi": [
+        "mụn",
+        "da mụn",
         "Da mình dầu mụn",
         "Mình bị mụn thì chọn dịch vụ nào?",
         "Da mặt mình nhiều dầu",
@@ -267,6 +463,8 @@
         "Có dịch vụ cho da dầu mụn không?"
       ],
       "trainingPhrasesEn": [
+        "acne",
+        "acne-prone skin",
         "I have oily acne-prone skin",
         "Which service should I choose for acne?",
         "My face is oily",
@@ -275,10 +473,10 @@
         "Do you have a service for oily acne-prone skin?"
       ],
       "responsesVi": [
-        "Với da dầu mụn, mình gợi ý nhóm chăm sóc da làm sạch sâu và phục hồi nhẹ. Mình sẽ kiểm tra dịch vụ phù hợp trong danh mục hiện tại cho bạn."
+        "Với da dầu mụn, mình gợi ý nhóm chăm sóc da làm sạch sâu, hỗ trợ kiểm soát dầu và phục hồi nhẹ. Mình sẽ kiểm tra dịch vụ phù hợp trong danh mục hiện tại cho bạn."
       ],
       "responsesEn": [
-        "For oily acne-prone skin, I recommend deep cleansing and gentle recovery skin care. I will check suitable services from the current catalog for you."
+        "For oily acne-prone skin, I recommend deep cleansing, oil control support, and gentle recovery skin care. I will check suitable services from the current catalog for you."
       ]
     },
     {
@@ -315,7 +513,7 @@
       ]
     },
     {
-      "displayName": "DatLich - KiemTraLichTrong",
+      "displayName": "TracNghiem - 5 - NailsPedicure",
       "webhookState": "WEBHOOK_STATE_ENABLED",
       "parameters": [
         {
@@ -325,12 +523,140 @@
         }
       ],
       "trainingPhrasesVi": [
+        "Mình muốn làm móng",
+        "Tư vấn nails cho mình",
+        "Nails & Pedicure có gì?",
+        "Móng tay móng chân của mình cần chăm sóc",
+        "Mình muốn sơn gel",
+        "Có dịch vụ pedicure không?",
+        "Làm móng hết bao lâu?",
+        "Mình muốn chăm sóc tay chân"
+      ],
+      "trainingPhrasesEn": [
+        "I want to do my nails",
+        "Can you advise me about nails?",
+        "What is included in Nails and Pedicure?",
+        "My hands and feet need care",
+        "I want gel polish",
+        "Do you have pedicure service?",
+        "How long does nail care take?",
+        "I want hand and foot care"
+      ],
+      "responsesVi": [
+        "Với nhu cầu làm móng hoặc chăm sóc tay chân, mình gợi ý dịch vụ Nails & Pedicure. Dịch vụ kéo dài khoảng 75 phút, giá 280,000đ, phù hợp nếu bạn muốn dũa tạo hình, chăm sóc móng và sơn gel bền màu. Bạn muốn mình kiểm tra lịch trống cho dịch vụ này không?"
+      ],
+      "responsesEn": [
+        "For nail or hand and foot care, I recommend Nails & Pedicure. It takes about 75 minutes and costs 280,000 VND, suitable for nail shaping, nail care, and long-lasting gel polish. Would you like me to check available slots for this service?"
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 6 - Waxing",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Mình muốn waxing",
+        "Tư vấn waxing cho mình",
+        "Có dịch vụ tẩy lông không?",
+        "Waxing vùng tay chân giá bao nhiêu?",
+        "Da nhạy cảm có waxing được không?",
+        "Mình muốn triệt lông bằng sáp",
+        "Waxing mất bao lâu?",
+        "Mình muốn da mịn hơn"
+      ],
+      "trainingPhrasesEn": [
+        "I want waxing",
+        "Can you advise me about waxing?",
+        "Do you have hair removal service?",
+        "How much is waxing for arms or legs?",
+        "Can sensitive skin do waxing?",
+        "I want wax hair removal",
+        "How long does waxing take?",
+        "I want smoother skin"
+      ],
+      "responsesVi": [
+        "Với nhu cầu tẩy lông hoặc làm da mịn hơn, mình gợi ý dịch vụ Waxing. Dịch vụ kéo dài khoảng 45 phút, giá 200,000đ, phù hợp cho các vùng cần waxing nhanh gọn và giúp da mịn trong vài tuần. Bạn muốn mình kiểm tra lịch trống cho dịch vụ này không?"
+      ],
+      "responsesEn": [
+        "For hair removal or smoother skin, I recommend Waxing. It takes about 45 minutes and costs 200,000 VND, suitable for quick waxing areas and smoother skin for several weeks. Would you like me to check available slots for this service?"
+      ]
+    },
+    {
+      "displayName": "TracNghiem - 7 - GoiCoDau",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        }
+      ],
+      "trainingPhrasesVi": [
+        "Mình chuẩn bị cưới",
+        "Tư vấn gói cô dâu cho mình",
+        "Gói cô dâu gồm những gì?",
+        "Mình có sự kiện đặc biệt",
+        "Mình muốn chăm sóc toàn diện trước ngày cưới",
+        "Cô dâu nên chọn dịch vụ nào?",
+        "Mình muốn làm đẹp trọn gói",
+        "Gói cưới giá bao nhiêu?"
+      ],
+      "trainingPhrasesEn": [
+        "I am preparing for my wedding",
+        "Can you advise me about the bridal package?",
+        "What is included in the bridal package?",
+        "I have a special event",
+        "I want full care before my wedding day",
+        "Which service should a bride choose?",
+        "I want a complete beauty package",
+        "How much is the wedding package?"
+      ],
+      "responsesVi": [
+        "Nếu bạn chuẩn bị cho ngày cưới hoặc sự kiện đặc biệt, mình gợi ý Gói Cô Dâu. Gói này kéo dài khoảng 180 phút, giá 1,200,000đ, gồm chăm sóc toàn diện như massage, chăm sóc da mặt, nails tay chân và hỗ trợ làm đẹp trước sự kiện. Bạn muốn mình kiểm tra lịch trống cho gói này không?"
+      ],
+      "responsesEn": [
+        "If you are preparing for a wedding or special event, I recommend the Bridal Package. It takes about 180 minutes and costs 1,200,000 VND, including comprehensive care such as massage, facial care, hand and foot nails, and beauty preparation before the event. Would you like me to check available slots for this package?"
+      ]
+    },
+    {
+      "displayName": "DatLich - KiemTraLichTrong",
+      "webhookState": "WEBHOOK_STATE_ENABLED",
+      "parameters": [
+        {
+          "displayName": "service_type",
+          "entityTypeDisplayName": "@service_type",
+          "value": "$service_type"
+        },
+        {
+          "displayName": "date",
+          "entityTypeDisplayName": "@sys.date",
+          "value": "$date"
+        }
+      ],
+      "trainingPhrasesVi": [
         "Mình muốn đặt lịch",
         "Đặt lịch cho mình",
         "Còn lịch trống hôm nay không?",
         "Có slot lúc 3 giờ không?",
         "Kiểm tra lịch trống giúp mình",
-        "Ngày mai còn kỹ thuật viên trống không?"
+        "Ngày mai còn kỹ thuật viên trống không?",
+        "Ngày 23/6/2026 dịch vụ chăm sóc da mặt",
+        "Chăm sóc da mặt ngày 23/6/2026",
+        "Kiểm tra lịch chăm sóc da mặt ngày mai",
+        "Ngày mai dịch vụ massage còn lịch không?",
+        "Mình muốn kiểm tra lịch trống cho dịch vụ massage ngày mai",
+        "Còn lịch chăm sóc da vào hôm nay không?",
+        "Ngày mai làm nails còn lịch không?",
+        "Kiểm tra lịch trống cho Nails & Pedicure hôm nay",
+        "Waxing ngày 23/6/2026 còn slot không?",
+        "Mình muốn đặt waxing ngày mai",
+        "Gói cô dâu ngày 23/6/2026 còn lịch không?",
+        "Mình muốn đặt gói cô dâu tuần này"
       ],
       "trainingPhrasesEn": [
         "I want to book an appointment",
@@ -338,7 +664,18 @@
         "Are there any available slots today?",
         "Do you have a 3 PM slot?",
         "Please check available slots for me",
-        "Is any technician available tomorrow?"
+        "Is any technician available tomorrow?",
+        "Facial service on June 23 2026",
+        "Please check facial availability tomorrow",
+        "Is massage available tomorrow?",
+        "I want to check available slots for massage tomorrow",
+        "Do you have facial slots today?",
+        "Is Nails and Pedicure available tomorrow?",
+        "Please check available slots for nails today",
+        "Is waxing available on June 23 2026?",
+        "I want to book waxing tomorrow",
+        "Is the bridal package available on June 23 2026?",
+        "I want to book the bridal package this week"
       ],
       "responsesVi": [
         "Được rồi. Bạn vui lòng cho mình biết dịch vụ và ngày mong muốn, mình sẽ kiểm tra lịch trống cho bạn."

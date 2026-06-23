@@ -77,6 +77,47 @@ function fallbackReply(languageCode) {
   return 'Mình xin lỗi, hiện tại mình chưa hiểu rõ yêu cầu này. Bạn có muốn gặp nhân viên tư vấn không?';
 }
 
+function protoValueToJs(value) {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'stringValue')) {
+    return value.stringValue;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'numberValue')) {
+    return value.numberValue;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'boolValue')) {
+    return value.boolValue;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'nullValue')) {
+    return null;
+  }
+
+  if (value.listValue?.values) {
+    return value.listValue.values.map(protoValueToJs);
+  }
+
+  if (value.structValue?.fields) {
+    return structToObject(value.structValue);
+  }
+
+  return undefined;
+}
+
+function structToObject(struct) {
+  const fields = struct?.fields || {};
+
+  return Object.entries(fields).reduce((accumulator, [key, value]) => {
+    accumulator[key] = protoValueToJs(value);
+    return accumulator;
+  }, {});
+}
+
 async function sendMessageToDialogflow({ sessionId, message, user }) {
   const projectId = getProjectId();
   const languageCode = detectLanguage(message);
@@ -108,6 +149,7 @@ async function sendMessageToDialogflow({ sessionId, message, user }) {
   const confidence = queryResult.intentDetectionConfidence || 0;
   const isFallback = intent === FALLBACK_INTENT;
   const handoffRequired = intent === HANDOFF_INTENT;
+  const parameters = structToObject(queryResult.parameters);
 
   return {
     reply,
@@ -117,6 +159,7 @@ async function sendMessageToDialogflow({ sessionId, message, user }) {
     handoffReason: handoffRequired ? 'user_requested' : undefined,
     confidence,
     isFallback,
+    parameters,
   };
 }
 
