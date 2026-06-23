@@ -14,4 +14,7 @@ router.post('/chot-lich-hen', giaoDichController.chotLichHen);
 // API XÁC NHẬN THANH TOÁN: Cập nhật trạng thái Deal sang Đã xác nhận
 router.post('/xac-nhan-thanh-toan', giaoDichController.xacNhanThanhToan);
 
+// API LẤY LỊCH SỬ ĐẶT HẸN: Truy xuất danh sách lịch hẹn từ Bitrix24
+router.get('/lich-su-dat-hen', giaoDichController.layLichSuDatHen);
+
 module.exports = router;
