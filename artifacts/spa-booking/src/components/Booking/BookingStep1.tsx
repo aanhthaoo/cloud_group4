@@ -24,7 +24,13 @@ export default function BookingStep1() {
   const [buoc_hien_tai, setBuocHienTai] = useState(1);
   const [dich_vu_da_chon, setDichVuDaChon] = useState<any>(null);
   const [ktv_da_chon, setKtvDaChon] = useState<any>(null);
-  const [ngay_da_chon, setNgayDaChon] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalDateString = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+
+  const [ngay_da_chon, setNgayDaChon] = useState(getLocalDateString());
   const [gio_da_chon, setGioDaChon] = useState<string | null>(null);
 
   const [ma_giao_dich, setMaGiaoDich] = useState<string | null>(null);
@@ -89,7 +95,7 @@ export default function BookingStep1() {
       setDangTaiLich(true);
       try {
         const res = await api.get("/api/bookings/unavailable-slots", {
-          params: { date: ngay_da_chon, resourceId: ktv_da_chon.id },
+          params: { date: ngay_da_chon, resourceId: ktv_da_chon.id, technicianName: ktv_da_chon.ten },
         });
         setUnavailableSlots(res.data.data || []);
       } catch (loi) {
@@ -124,9 +130,20 @@ export default function BookingStep1() {
   // ─── Validate giờ hợp lệ ─────────────────────────────────────────────
   const kiemTraGioHopLe = (gio: string, ngay_da_chon_param: string) => {
     const hien_tai = new Date();
-    const ngay_chon = new Date(ngay_da_chon_param);
-    if (ngay_chon.toDateString() !== hien_tai.toDateString()) return true;
+    // Reset time for current day to check past dates properly
+    const hom_nay = new Date(hien_tai.getFullYear(), hien_tai.getMonth(), hien_tai.getDate());
+    
+    // Parse the selected date (using local timezone instead of UTC)
+    const [year, month, day] = ngay_da_chon_param.split('-').map(Number);
+    const ngay_chon = new Date(year, month - 1, day);
 
+    // Bỏ qua nếu là ngày trong quá khứ
+    if (ngay_chon.getTime() < hom_nay.getTime()) return false;
+
+    // Nếu không phải hôm nay (tức là ngày tương lai), giờ nào cũng hợp lệ
+    if (ngay_chon.getTime() > hom_nay.getTime()) return true;
+
+    // Nếu là hôm nay, kiểm tra giờ
     const [gio_hen, phut_hen] = gio.split(':').map(Number);
     const gio_hien_tai = hien_tai.getHours();
     const phut_hien_tai = hien_tai.getMinutes();
@@ -714,7 +731,7 @@ export default function BookingStep1() {
                     <input
                       type="date"
                       value={ngay_da_chon}
-                      min={new Date().toISOString().split('T')[0]}
+                      min={getLocalDateString()}
                       onChange={(e) => setNgayDaChon(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-primary outline-none transition-all font-medium text-gray-700"
                     />

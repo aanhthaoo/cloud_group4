@@ -19,11 +19,7 @@ class Booking {
     this.depositAmount = depositAmount;
     this.status = status;           // 'pending', 'soft-hold', 'confirmed', 'completed', 'cancelled'
     this.softHoldExpiresAt = softHoldExpiresAt; // Hạn giữ chỗ
-    
-    // Bổ sung timeslot khách đặt thuộc ngày nào theo yêu cầu
-    this.appointmentDate = bookingDate; // Timestamp ngày đặt (hoặc chuỗi YYYY-MM-DD)
-    this.appointmentTime = timeSlot;    // Chuỗi giờ (VD: 10:30)
-    
+
     // Denormalization: Lưu thông tin dịch vụ
     this.service = {
       id: service.id,
@@ -45,8 +41,6 @@ class Booking {
       userId: this.userId,
       bookingDate: this.bookingDate,
       timeSlot: this.timeSlot,
-      appointmentDate: this.appointmentDate,
-      appointmentTime: this.appointmentTime,
       totalPrice: this.totalPrice,
       depositAmount: this.depositAmount,
       status: this.status,
@@ -65,7 +59,7 @@ class Booking {
     if (obj.service) {
       Object.keys(obj.service).forEach(k => obj.service[k] === undefined && delete obj.service[k]);
     }
-    
+
     if (obj.technician) {
       Object.keys(obj.technician).forEach(k => obj.technician[k] === undefined && delete obj.technician[k]);
     }
