@@ -80,10 +80,14 @@ async function confirmPayment(req, res) {
     const { bookingId } = req.params;
     const { receiptFileName } = req.body;
 
+    console.log(`\n========== [CONFIRM PAYMENT] START ==========`);
+    console.log(`[1] bookingId: ${bookingId}, receiptFileName: ${receiptFileName}`);
+
     const bookingRef = db.collection("bookings").doc(bookingId);
     const bookingDoc = await bookingRef.get();
 
     if (!bookingDoc.exists) {
+      console.log(`[1] FAIL: Không tìm thấy booking ${bookingId}`);
       return res.status(404).json({
         status: "error",
         message: "Không tìm thấy lịch hẹn",
@@ -91,8 +95,10 @@ async function confirmPayment(req, res) {
     }
 
     const booking = bookingDoc.data();
+    console.log(`[2] Booking found: uid=${booking.uid}, status=${booking.status}, depositAmount=${booking.depositAmount}`);
 
     if (booking.status === "confirmed") {
+      console.log(`[2] Booking đã confirmed trước đó, bỏ qua.`);
       return res.status(200).json({
         status: "success",
         message: "Lịch hẹn đã được xác nhận trước đó",
@@ -104,6 +110,7 @@ async function confirmPayment(req, res) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
+      console.log(`[3] FAIL: Không tìm thấy user với uid=${booking.uid}`);
       throw new Error("Không tìm thấy thông tin khách hàng");
     }
 
@@ -111,6 +118,7 @@ async function confirmPayment(req, res) {
       uid: booking.uid,
       ...userDoc.data(),
     };
+    console.log(`[3] User found: email=${user.email}, fullName=${user.fullName}`);
 
     await bookingRef.update({
       status: "confirmed",
@@ -119,6 +127,7 @@ async function confirmPayment(req, res) {
       confirmedAt: new Date(),
       updatedAt: new Date(),
     });
+    console.log(`[4] Booking updated -> status=confirmed`);
 
     const confirmedBooking = {
       ...booking,
@@ -127,20 +136,41 @@ async function confirmPayment(req, res) {
       receiptFileName: receiptFileName || null,
     };
 
+    console.log(`[5] Gọi applyLoyaltyAfterPayment: uid=${booking.uid}, depositAmount=${booking.depositAmount}`);
     const loyaltyResult = await applyLoyaltyAfterPayment(
       booking.uid,
       booking.depositAmount
     );
+    console.log(`[5] loyaltyResult:`, JSON.stringify({
+      pointsAdded: loyaltyResult.pointsAdded,
+      oldTier: loyaltyResult.oldTier,
+      newTier: loyaltyResult.newTier,
+      isTierUpgraded: loyaltyResult.isTierUpgraded,
+      alreadyProcessed: loyaltyResult.alreadyProcessed,
+      bitrixSyncError: loyaltyResult.bitrixSyncError,
+      loyalty: loyaltyResult.loyalty,
+    }, null, 2));
 
-    await sendAppointmentConfirmation(user, confirmedBooking);
-    await sendPaymentInvoice(user, confirmedBooking);
+    const invoicePayload = {
+      ...confirmedBooking,
+      pointsAdded: loyaltyResult.pointsAdded,
+      loyalty: loyaltyResult.loyalty,
+    };
+
+    const emailTasks = [
+      sendAppointmentConfirmation(user, confirmedBooking),
+      sendPaymentInvoice(user, invoicePayload)
+    ];
 
     if (loyaltyResult.isTierUpgraded) {
-      await sendTierUpgradeEmail(
-        user,
-        loyaltyResult.oldTier,
-        loyaltyResult.newTier,
-        loyaltyResult.loyalty
+      console.log(`[6] isTierUpgraded=true, thêm task gửi email tier upgrade`);
+      emailTasks.push(
+        sendTierUpgradeEmail(
+          user,
+          loyaltyResult.oldTier,
+          loyaltyResult.newTier,
+          loyaltyResult.loyalty
+        )
       );
     }
 
@@ -156,6 +186,19 @@ async function confirmPayment(req, res) {
       console.error('[confirmPayment → Bitrix] Lỗi gọi Bitrix placeholder:', err)
     );
 
+    console.log(`[6] Bắt đầu gửi ${emailTasks.length} email song song...`);
+    const emailResults = await Promise.allSettled(emailTasks);
+    emailResults.forEach((r, i) => {
+      const label = ["appointment_confirmation", "payment_invoice", "tier_upgrade"][i];
+      if (r.status === "fulfilled") {
+        console.log(`[6] Email [${label}]: OK -`, JSON.stringify(r.value));
+      } else {
+        console.error(`[6] Email [${label}]: FAIL -`, r.reason);
+      }
+    });
+
+    console.log(`========== [CONFIRM PAYMENT] END (SUCCESS) ==========\n`);
+
     return res.status(200).json({
       status: "success",
       message: "Xác nhận thanh toán, cộng điểm và gửi email thành công",
@@ -169,7 +212,7 @@ async function confirmPayment(req, res) {
       },
     });
   } catch (error) {
-    console.error("Confirm payment error:", error);
+    console.error(`[CONFIRM PAYMENT] UNEXPECTED ERROR:`, error);
 
     return res.status(500).json({
       status: "error",

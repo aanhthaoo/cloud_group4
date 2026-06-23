@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState } from "react";
 import api from "../lib/axios";
 
 interface User {
+  uid?: string;
   name: string;
   email: string;
   phone: string;

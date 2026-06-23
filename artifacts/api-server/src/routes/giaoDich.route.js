@@ -17,4 +17,6 @@ router.post('/xac-nhan-thanh-toan', giaoDichController.xacNhanThanhToan);
 // API LẤY LỊCH SỬ ĐẶT HẸN: Truy xuất danh sách lịch hẹn từ Bitrix24
 router.get('/lich-su-dat-hen', giaoDichController.layLichSuDatHen);
 
+router.post('/dong-bo-diem-bitrix', giaoDichController.dongBoDiemBitrixDaThanhToan);
+
 module.exports = router;

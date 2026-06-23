@@ -19,12 +19,8 @@ router.get("/api/availability", (req, res) => {
   });
 });
 
-router.post('/api/bookings', (req, res) => {
-  // TODO: Tích hợp logic tạo booking thực tế
-  res.status(501).json({
-    message: 'Chức năng tạo booking chưa được implement'
-  });
-});
+
+
 
 // Route lấy Presigned URL để upload file lên R2
 router.get('/api/upload-url/receipt', async (req, res) => {

@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import api from "@/lib/axios";
 import Recaptcha from "@/components/Recaptcha";
+import { useAuth } from "@/contexts/AuthContext";
 
 
 
 export default function BookingStep1() {
+  const { user } = useAuth();
   // ─── 1. State chọn lịch ───────────────────────────────────────────────
   const [danh_sach_dich_vu, setDanhSachDichVu] = useState<any[]>([]);
   const [danh_sach_ktv, setDanhSachKtv] = useState<any[]>([]);
@@ -172,7 +174,11 @@ export default function BookingStep1() {
         ten_ktv: ktv_da_chon.ten,
         ngay_dat: ngay_da_chon,
         gio_dat: gio_da_chon,
-        thoi_gian: dich_vu_da_chon.thoi_gian
+        thoi_gian: dich_vu_da_chon.thoi_gian,
+        uid: user?.uid,
+        customerName: user?.name,
+        customerEmail: user?.email,
+        customerPhone: user?.phone,
       });
 
       if (phan_hoi.data.thanh_cong) {
@@ -334,17 +340,15 @@ export default function BookingStep1() {
 
         {/* BANNER ĐỒNG HỒ ĐẾM NGƯỢC */}
         {thoi_gian_con_lai >= 0 && (
-          <div className={`mb-6 rounded-2xl px-5 py-4 flex items-center justify-between border transition-all duration-500 ${
-            da_het_gio
-              ? 'bg-red-50 border-red-200 text-red-800'
-              : sap_het_gio
+          <div className={`mb-6 rounded-2xl px-5 py-4 flex items-center justify-between border transition-all duration-500 ${da_het_gio
+            ? 'bg-red-50 border-red-200 text-red-800'
+            : sap_het_gio
               ? 'bg-orange-50 border-orange-300 text-orange-800'
               : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-          }`}>
+            }`}>
             <div className="flex items-center gap-3">
-              <ThuVienIcon.Timer className={`w-5 h-5 shrink-0 ${
-                da_het_gio ? 'text-red-500' : sap_het_gio ? 'text-orange-500 animate-pulse' : 'text-emerald-500'
-              }`} />
+              <ThuVienIcon.Timer className={`w-5 h-5 shrink-0 ${da_het_gio ? 'text-red-500' : sap_het_gio ? 'text-orange-500 animate-pulse' : 'text-emerald-500'
+                }`} />
               <div>
                 <p className="font-bold text-sm">
                   {da_het_gio ? '⚠️ Thời gian giữ chỗ đã hết!' : 'Slot đang được giữ cho bạn'}
@@ -353,16 +357,15 @@ export default function BookingStep1() {
                   {da_het_gio
                     ? 'Slot có thể đã được người khác đặt. Vui lòng quay lại chọn giờ mới.'
                     : sap_het_gio
-                    ? 'Còn rất ít thời gian! Hãy hoàn tất thanh toán ngay.'
-                    : 'Hoàn tất thanh toán trước khi hết giờ giữ chỗ.'}
+                      ? 'Còn rất ít thời gian! Hãy hoàn tất thanh toán ngay.'
+                      : 'Hoàn tất thanh toán trước khi hết giờ giữ chỗ.'}
                 </p>
               </div>
             </div>
             {/* Đồng hồ */}
             {!da_het_gio ? (
-              <div className={`font-mono text-2xl font-black tracking-widest px-4 py-2 rounded-xl ${
-                sap_het_gio ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
-              }`}>
+              <div className={`font-mono text-2xl font-black tracking-widest px-4 py-2 rounded-xl ${sap_het_gio ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
+                }`}>
                 {phut}:{giay}
               </div>
             ) : (
@@ -379,181 +382,181 @@ export default function BookingStep1() {
         {/* Overlay mờ khi hết giờ — vẫn cho nhìn thấy nội dung nhưng disabled */}
         <div className={`relative transition-opacity duration-700 ${da_het_gio ? 'opacity-40 pointer-events-none select-none' : ''}`}>
           <div className="grid md:grid-cols-2 gap-8">
-          {/* CỘT TRÁI: HÓA ĐƠN & NGÂN HÀNG */}
-          <div className="space-y-6">
-            <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
-              <h3 className="text-lg font-bold text-gray-800 border-b border-gray-50 pb-3">Hóa đơn tạm tính</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Dịch vụ:</span>
-                  <span className="font-bold text-gray-800">{dich_vu_da_chon?.ten}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Kỹ thuật viên:</span>
-                  <span className="font-bold text-gray-800">{ktv_da_chon?.ten}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Ngày & Giờ:</span>
-                  <span className="font-bold text-gray-800">
-                    {gio_da_chon} • {new Date(ngay_da_chon).toLocaleDateString('vi-VN')}
-                  </span>
-                </div>
-                <div className="pt-3 border-t border-dashed flex justify-between">
-                  <span className="text-gray-600 font-bold">Tổng cộng:</span>
-                  <span className="font-bold text-gray-800">{tong_cong.toLocaleString('vi-VN')}đ</span>
-                </div>
-                <div className="flex justify-between items-center py-2 bg-primary/5 px-3 rounded-lg border border-primary/10">
-                  <span className="text-primary font-bold text-base">Đặt cọc (30%):</span>
-                  <span className="text-xl font-black text-primary">{tien_coc.toLocaleString('vi-VN')}đ</span>
-                </div>
-                <div className="flex justify-between text-xs text-gray-400 italic">
-                  <span>Còn lại thanh toán tại Spa:</span>
-                  <span>{tien_con_lai.toLocaleString('vi-VN')}đ</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-6">
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest text-center">Thông tin chuyển khoản</h3>
-              <div className="flex justify-center">
-                <div className="p-4 bg-white rounded-2xl shadow-inner border border-gray-100">
-                  <img src={link_qr_hien_tai || ""} alt="Mã VietQR" className="w-52 h-52 mx-auto" />
-                </div>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-400">Ngân hàng:</span> <span className="font-bold text-gray-700">MB Bank</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Tên tài khoản:</span> <span className="font-bold text-gray-700 uppercase">DINH VAN MANH</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Số tài khoản:</span> <span className="font-black text-primary text-base">0377172930</span></div>
-                <div className="pt-2 border-t border-gray-200">
-                  <p className="text-xs text-gray-400 mb-1 font-bold">NỘI DUNG CHUYỂN KHOẢN:</p>
-                  <p className="font-black text-primary text-lg">LOTUSGLOW DH{ma_giao_dich}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CỘT PHẢI: UPLOAD BIÊN LAI + reCAPTCHA + XÁC NHẬN */}
-          <div className="space-y-6">
-            <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
-              <h3 className="text-lg font-bold text-gray-800">Tải lên biên lai</h3>
-              <p className="text-xs text-gray-500">Vui lòng tải lên ảnh chụp màn hình chuyển khoản thành công.</p>
-
-              <label className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl flex flex-col items-center justify-center p-12 cursor-pointer hover:bg-primary/10 transition-all group">
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  data-testid="input-receipt-upload"
-                  disabled={isUploading}
-                />
-                {isUploading ? (
-                  <div className="flex flex-col items-center text-center">
-                    <ThuVienIcon.Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
-                    <span className="text-sm font-medium text-foreground">Đang tải lên...</span>
-                  </div>
-                ) : file && uploadedFileName ? (
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-3">
-                      <ThuVienIcon.Check className="w-6 h-6" />
-                    </div>
-                    <p className="text-sm font-bold text-primary truncate max-w-full">{file.name}</p>
-                    <span className="text-xs text-muted-foreground mt-1">Nhấn để tải lại ảnh khác</span>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <ThuVienIcon.UploadCloud className="w-10 h-10 text-primary/60 mb-3 mx-auto group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-medium text-primary">Kéo thả hoặc Nhấn để tải ảnh lên</p>
-                    <p className="text-[10px] text-gray-400 mt-1">PNG, JPG tối đa 5MB</p>
-                  </div>
-                )}
-              </label>
-
-              {/* Kết quả OCR — thất bại */}
-              {ocrFailed && (
-                <div className="text-sm bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
-                  <p className="font-medium text-red-700 flex items-center gap-1">
-                    <ThuVienIcon.AlertTriangle className="w-4 h-4 shrink-0" /> OCR đọc ảnh thất bại
-                  </p>
-                  <p className="text-red-600">
-                    {ocrResult?.ocrErrorDetail
-                      ? `Lý do: ${ocrResult.ocrErrorDetail}`
-                      : "Không rõ lý do — xem terminal backend để biết chi tiết."}
-                  </p>
-                </div>
-              )}
-
-              {/* Kết quả OCR — thành công */}
-              {hasVerifiedOcr && ocrResult && (
-                <div className="text-sm bg-slate-50 rounded-lg p-3 space-y-1">
-                  <p className="font-medium text-foreground">Kết quả OCR (tự động đọc từ ảnh):</p>
+            {/* CỘT TRÁI: HÓA ĐƠN & NGÂN HÀNG */}
+            <div className="space-y-6">
+              <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
+                <h3 className="text-lg font-bold text-gray-800 border-b border-gray-50 pb-3">Hóa đơn tạm tính</h3>
+                <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Số tiền nhận diện:</span>
-                    <span className="font-medium">
-                      {ocrResult.detectedAmount
-                        ? `${ocrResult.detectedAmount.toLocaleString("vi-VN")}đ`
-                        : "Không đọc được"}
+                    <span className="text-gray-500">Dịch vụ:</span>
+                    <span className="font-bold text-gray-800">{dich_vu_da_chon?.ten}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Kỹ thuật viên:</span>
+                    <span className="font-bold text-gray-800">{ktv_da_chon?.ten}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Ngày & Giờ:</span>
+                    <span className="font-bold text-gray-800">
+                      {gio_da_chon} • {new Date(ngay_da_chon).toLocaleDateString('vi-VN')}
                     </span>
                   </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Người nhận:</span>
-                    <span className="font-medium text-right">{ocrResult.detectedRecipient || "Không đọc được"}</span>
+                  <div className="pt-3 border-t border-dashed flex justify-between">
+                    <span className="text-gray-600 font-bold">Tổng cộng:</span>
+                    <span className="font-bold text-gray-800">{tong_cong.toLocaleString('vi-VN')}đ</span>
                   </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Nội dung nhận diện:</span>
-                    <span className="font-medium text-right">{ocrResult.detectedContent || "Không đọc được"}</span>
+                  <div className="flex justify-between items-center py-2 bg-primary/5 px-3 rounded-lg border border-primary/10">
+                    <span className="text-primary font-bold text-base">Đặt cọc (30%):</span>
+                    <span className="text-xl font-black text-primary">{tien_coc.toLocaleString('vi-VN')}đ</span>
                   </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Thời gian chuyển khoản:</span>
-                    <span className="font-medium text-right">{ocrResult.detectedTransferDate || "Không đọc được"}</span>
+                  <div className="flex justify-between text-xs text-gray-400 italic">
+                    <span>Còn lại thanh toán tại Spa:</span>
+                    <span>{tien_con_lai.toLocaleString('vi-VN')}đ</span>
                   </div>
                 </div>
-              )}
+              </div>
+
+              <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-6">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest text-center">Thông tin chuyển khoản</h3>
+                <div className="flex justify-center">
+                  <div className="p-4 bg-white rounded-2xl shadow-inner border border-gray-100">
+                    <img src={link_qr_hien_tai || ""} alt="Mã VietQR" className="w-52 h-52 mx-auto" />
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-400">Ngân hàng:</span> <span className="font-bold text-gray-700">MB Bank</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Tên tài khoản:</span> <span className="font-bold text-gray-700 uppercase">DINH VAN MANH</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Số tài khoản:</span> <span className="font-black text-primary text-base">0377172930</span></div>
+                  <div className="pt-2 border-t border-gray-200">
+                    <p className="text-xs text-gray-400 mb-1 font-bold">NỘI DUNG CHUYỂN KHOẢN:</p>
+                    <p className="font-black text-primary text-lg">LOTUSGLOW DH{ma_giao_dich}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* reCAPTCHA thật */}
-            <div>
-              <Recaptcha onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+            {/* CỘT PHẢI: UPLOAD BIÊN LAI + reCAPTCHA + XÁC NHẬN */}
+            <div className="space-y-6">
+              <div className="border border-gray-200 rounded-2xl shadow-sm p-6 bg-white space-y-4">
+                <h3 className="text-lg font-bold text-gray-800">Tải lên biên lai</h3>
+                <p className="text-xs text-gray-500">Vui lòng tải lên ảnh chụp màn hình chuyển khoản thành công.</p>
+
+                <label className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl flex flex-col items-center justify-center p-12 cursor-pointer hover:bg-primary/10 transition-all group">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    data-testid="input-receipt-upload"
+                    disabled={isUploading}
+                  />
+                  {isUploading ? (
+                    <div className="flex flex-col items-center text-center">
+                      <ThuVienIcon.Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
+                      <span className="text-sm font-medium text-foreground">Đang tải lên...</span>
+                    </div>
+                  ) : file && uploadedFileName ? (
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-3">
+                        <ThuVienIcon.Check className="w-6 h-6" />
+                      </div>
+                      <p className="text-sm font-bold text-primary truncate max-w-full">{file.name}</p>
+                      <span className="text-xs text-muted-foreground mt-1">Nhấn để tải lại ảnh khác</span>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <ThuVienIcon.UploadCloud className="w-10 h-10 text-primary/60 mb-3 mx-auto group-hover:scale-110 transition-transform" />
+                      <p className="text-sm font-medium text-primary">Kéo thả hoặc Nhấn để tải ảnh lên</p>
+                      <p className="text-[10px] text-gray-400 mt-1">PNG, JPG tối đa 5MB</p>
+                    </div>
+                  )}
+                </label>
+
+                {/* Kết quả OCR — thất bại */}
+                {ocrFailed && (
+                  <div className="text-sm bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
+                    <p className="font-medium text-red-700 flex items-center gap-1">
+                      <ThuVienIcon.AlertTriangle className="w-4 h-4 shrink-0" /> OCR đọc ảnh thất bại
+                    </p>
+                    <p className="text-red-600">
+                      {ocrResult?.ocrErrorDetail
+                        ? `Lý do: ${ocrResult.ocrErrorDetail}`
+                        : "Không rõ lý do — xem terminal backend để biết chi tiết."}
+                    </p>
+                  </div>
+                )}
+
+                {/* Kết quả OCR — thành công */}
+                {hasVerifiedOcr && ocrResult && (
+                  <div className="text-sm bg-slate-50 rounded-lg p-3 space-y-1">
+                    <p className="font-medium text-foreground">Kết quả OCR (tự động đọc từ ảnh):</p>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Số tiền nhận diện:</span>
+                      <span className="font-medium">
+                        {ocrResult.detectedAmount
+                          ? `${ocrResult.detectedAmount.toLocaleString("vi-VN")}đ`
+                          : "Không đọc được"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Người nhận:</span>
+                      <span className="font-medium text-right">{ocrResult.detectedRecipient || "Không đọc được"}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Nội dung nhận diện:</span>
+                      <span className="font-medium text-right">{ocrResult.detectedContent || "Không đọc được"}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Thời gian chuyển khoản:</span>
+                      <span className="font-medium text-right">{ocrResult.detectedTransferDate || "Không đọc được"}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* reCAPTCHA thật */}
+              <div>
+                <Recaptcha onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+              </div>
+
+              {/* Nút xác nhận */}
+              <Button
+                className="w-full h-14 text-lg font-medium shadow-md"
+                size="lg"
+                data-testid="button-confirm-payment"
+                disabled={
+                  isFinalizing || (hasVerifiedOcr
+                    ? false
+                    : ocrFailed
+                      ? isVerifying
+                      : true)
+                }
+                onClick={
+                  hasVerifiedOcr
+                    ? xuLyXacNhanThanhToan
+                    : ocrFailed
+                      ? handleConfirmOCR
+                      : undefined
+                }
+              >
+                {isFinalizing
+                  ? "Đang đối soát hệ thống..."
+                  : isVerifying
+                    ? "Đang đọc thông tin biên lai..."
+                    : hasVerifiedOcr
+                      ? "Xác nhận thông tin & Chốt lịch"
+                      : ocrFailed
+                        ? "Thử đọc lại biên lai"
+                        : !uploadedFileName
+                          ? "Vui lòng tải ảnh biên lai lên"
+                          : !captchaToken
+                            ? "Vui lòng xác thực reCAPTCHA"
+                            : "Đang xử lý..."}
+              </Button>
+
+
             </div>
-
-            {/* Nút xác nhận */}
-            <Button
-              className="w-full h-14 text-lg font-medium shadow-md"
-              size="lg"
-              data-testid="button-confirm-payment"
-              disabled={
-                isFinalizing || (hasVerifiedOcr
-                  ? false
-                  : ocrFailed
-                    ? isVerifying
-                    : true)
-              }
-              onClick={
-                hasVerifiedOcr
-                  ? xuLyXacNhanThanhToan
-                  : ocrFailed
-                    ? handleConfirmOCR
-                    : undefined
-              }
-            >
-              {isFinalizing
-                ? "Đang đối soát hệ thống..."
-                : isVerifying
-                ? "Đang đọc thông tin biên lai..."
-                : hasVerifiedOcr
-                  ? "Xác nhận thông tin & Chốt lịch"
-                  : ocrFailed
-                    ? "Thử đọc lại biên lai"
-                    : !uploadedFileName
-                      ? "Vui lòng tải ảnh biên lai lên"
-                      : !captchaToken
-                        ? "Vui lòng xác thực reCAPTCHA"
-                        : "Đang xử lý..."}
-            </Button>
-
-
           </div>
-        </div>
         </div>{/* /relative overlay wrapper */}
 
         {/* Popup thành công */}
@@ -638,9 +641,8 @@ export default function BookingStep1() {
                   <div
                     key={dv.id}
                     onClick={() => setDichVuDaChon(dv)}
-                    className={`p-5 cursor-pointer transition-all border-2 rounded-xl flex gap-4 items-center ${
-                      la_dang_chon ? "border-primary bg-primary/10 shadow-sm" : "border-gray-100 hover:border-primary/50 bg-white"
-                    }`}
+                    className={`p-5 cursor-pointer transition-all border-2 rounded-xl flex gap-4 items-center ${la_dang_chon ? "border-primary bg-primary/10 shadow-sm" : "border-gray-100 hover:border-primary/50 bg-white"
+                      }`}
                   >
                     <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center ${la_dang_chon ? 'bg-white text-primary shadow-sm' : 'bg-primary/10 text-primary'}`}>
                       <BieuTuong className="w-6 h-6" />
@@ -671,9 +673,8 @@ export default function BookingStep1() {
                   <div
                     key={ktv.id}
                     onClick={() => setKtvDaChon(ktv)}
-                    className={`p-4 cursor-pointer transition-all border-2 rounded-xl flex flex-col items-center text-center ${
-                      la_dang_chon ? "border-primary bg-primary/10 shadow-sm" : "border-gray-50 hover:border-primary/50 bg-white"
-                    }`}
+                    className={`p-4 cursor-pointer transition-all border-2 rounded-xl flex flex-col items-center text-center ${la_dang_chon ? "border-primary bg-primary/10 shadow-sm" : "border-gray-50 hover:border-primary/50 bg-white"
+                      }`}
                   >
                     <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg mb-3 border-2 border-white shadow-sm uppercase">
                       {chu_cai_dau}
@@ -736,13 +737,12 @@ export default function BookingStep1() {
                             key={gio}
                             disabled={bi_khoa}
                             onClick={() => setGioDaChon(gio)}
-                            className={`py-3 text-sm font-bold rounded-xl border transition-all ${
-                              la_dang_chon
-                                ? "bg-primary border-primary text-primary-foreground shadow-md"
-                                : !bi_khoa
-                                  ? "border-gray-200 text-gray-600 hover:border-primary bg-white font-bold"
-                                  : "bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed"
-                            }`}
+                            className={`py-3 text-sm font-bold rounded-xl border transition-all ${la_dang_chon
+                              ? "bg-primary border-primary text-primary-foreground shadow-md"
+                              : !bi_khoa
+                                ? "border-gray-200 text-gray-600 hover:border-primary bg-white font-bold"
+                                : "bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed"
+                              }`}
                           >
                             {gio}
                           </button>
