@@ -21,7 +21,9 @@ class User {
     this.loyalty = {
       tier: loyalty.tier || 'Member',
       points: loyalty.points || 0,
-      totalSpent: loyalty.totalSpent || 0
+      lifetimePoints: loyalty.lifetimePoints || loyalty.points || 0,
+      totalSpent: loyalty.totalSpent || 0,
+      discountPercent: loyalty.discountPercent || 0
     };
   }
 

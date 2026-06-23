@@ -1,4 +1,7 @@
-const BITRIX_WEBHOOK_URL = process.env.BITRIX_WEBHOOK_URL?.replace(/\/$/, "");
+const BITRIX_WEBHOOK_URL = (
+  process.env.BITRIX_WEBHOOK_URL ||
+  "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/"
+).replace(/\/$/, "");
 
 async function bitrixCall(method, payload = {}) {
   if (!BITRIX_WEBHOOK_URL) {
