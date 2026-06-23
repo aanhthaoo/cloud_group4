@@ -1,8 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+// Trigger restart to load new env vars
 
-require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 require('dotenv').config();
 const { db } = require('./config/firebase'); // Gọi kết nối từ tệp cấu hình
 
@@ -12,7 +11,12 @@ app.use(express.json());
 
 // Import các routes API
 const indexRoutes = require('./routes/index.routes.js');
-app.use('/api', indexRoutes);
+const paymentRoutes = require('./routes/payment.routes.js');
+const chatRoutes = require('./routes/chat.routes.js');
+app.use('/', indexRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api', chatRoutes);
+
 
 // Route gốc
 app.get('/', (req, res) => {

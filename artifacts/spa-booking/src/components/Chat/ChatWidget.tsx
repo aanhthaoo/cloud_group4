@@ -477,8 +477,8 @@ export default function ChatWidget() {
                   {handoffStatus === "connecting"
                     ? "Đang kết nối nhân viên..."
                     : handoffStatus === "connected"
-                    ? "Đã chuyển sang HubSpot"
-                    : "Gặp nhân viên hỗ trợ"}
+                      ? "Đã chuyển sang HubSpot"
+                      : "Gặp nhân viên hỗ trợ"}
                 </Button>
               </CardFooter>
             </Card>

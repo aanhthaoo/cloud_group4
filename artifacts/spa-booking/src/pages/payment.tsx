@@ -1,42 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
+import React from "react";
 import { Card } from "@/components/ui/card";
-import { Upload, Check, Clock, AlertTriangle } from "lucide-react";
+import { Info } from "lucide-react";
 
-const HOLD_SECONDS = 15 * 60;
-
+/**
+ * Trang /payment không còn được sử dụng.
+ * Luồng thanh toán (upload biên lai R2, reCAPTCHA, OCR) đã được
+ * tích hợp trực tiếp vào BookingStep1 (/booking).
+ */
 export default function Payment() {
-  const [, setLocation] = useLocation();
-  const [isChecked, setIsChecked] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [timeLeft, setTimeLeft] = useState(HOLD_SECONDS);
-  const [expired, setExpired] = useState(false);
-
-  useEffect(() => {
-    if (expired) return;
-    if (timeLeft <= 0) { setExpired(true); return; }
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) { clearInterval(timer); setExpired(true); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [expired]);
-
-  const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
-  const seconds = (timeLeft % 60).toString().padStart(2, "0");
-  const isUrgent = timeLeft <= 120 && !expired;
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
-  };
-
-  const handleConfirm = () => {
-    setLocation("/booking-status");
-  };
-
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
@@ -45,11 +16,10 @@ export default function Payment() {
         {/* Countdown */}
         <div
           data-testid="countdown-timer"
-          className={`flex items-center justify-center gap-3 rounded-xl px-6 py-4 mb-8 border transition-colors ${
-            expired ? "bg-red-50 border-red-200"
-              : isUrgent ? "bg-orange-50 border-orange-300 animate-pulse"
+          className={`flex items-center justify-center gap-3 rounded-xl px-6 py-4 mb-8 border transition-colors ${expired ? "bg-red-50 border-red-200"
+            : isUrgent ? "bg-orange-50 border-orange-300 animate-pulse"
               : "bg-primary/10 border-primary/20"
-          }`}
+            }`}
         >
           <Clock className={`w-5 h-5 shrink-0 ${expired ? "text-red-500" : isUrgent ? "text-orange-500" : "text-primary"}`} />
           {expired ? (

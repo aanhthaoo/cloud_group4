@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { Turnstile } from "@marsidev/react-turnstile";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string;
 
 export default function Register() {
   const { register } = useAuth();
@@ -14,27 +18,29 @@ export default function Register() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  
+
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!fullName.trim() || !phoneNumber.trim() || !email.trim() || !password) {
       toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
-    
+
     if (password !== confirmPassword) {
       toast.error("Mật khẩu xác nhận không khớp");
       return;
     }
-    
+
     if (password.length < 6) {
       toast.error("Mật khẩu phải có ít nhất 6 ký tự");
       return;
@@ -46,12 +52,16 @@ export default function Register() {
         email: email.trim(),
         password,
         fullName: fullName.trim(),
-        phoneNumber: phoneNumber.trim()
+        phoneNumber: phoneNumber.trim(),
+        cfTurnstileResponse: turnstileToken ?? undefined,
       });
       toast.success("Đăng ký thành công!");
       setLocation("/");
     } catch (err: any) {
       toast.error(err.message || "Đã có lỗi xảy ra");
+      // Reset Turnstile để người dùng xác minh lại
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -171,11 +181,25 @@ export default function Register() {
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4 pb-8 px-6">
+            {/* Cloudflare Turnstile widget */}
+            <div className="w-full flex justify-center">
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={(token: string) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => {
+                  setTurnstileToken(null);
+                  toast.error("Xác minh bảo mật thất bại, vui lòng thử lại.");
+                }}
+                options={{ theme: "auto" }}
+              />
+            </div>
             <Button
               type="submit"
               className="w-full h-12 text-lg shadow-sm"
               data-testid="button-register"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken}
             >
               {isLoading ? "Đang xử lý..." : "Đăng ký tài khoản"}
             </Button>
