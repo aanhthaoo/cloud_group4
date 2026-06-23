@@ -177,17 +177,37 @@ const xacNhanThanhToan = async (req, res) => {
         const url_goc = "https://b24-krzt7r.bitrix24.vn/rest/1/t022sbp9vx9u578s/";
         if (!id_giao_dich) return res.status(400).json({ loi: "Thiếu ID giao dịch" });
 
+        // B1: Lấy Deal từ Bitrix
+        console.log(`[xacNhanThanhToan] B1 - Lấy deal ${id_giao_dich} từ Bitrix24`);
         const deal_res = await axios.get(`${url_goc}crm.deal.get?id=${id_giao_dich}`);
         const deal = deal_res.data.result;
         if (!deal) return res.status(404).json({ loi: "Không tìm thấy Deal." });
 
-        const snapshot = await db.collection('transactions').where('bookingId', 'in', [String(id_giao_dich), Number(id_giao_dich)]).get();
+        // B2: Tìm transaction OCR — dùng 2 query riêng để tránh lỗi mixed-type
+        console.log(`[xacNhanThanhToan] B2 - Tìm transaction cho bookingId: ${id_giao_dich}`);
+        let snapshot;
+        try {
+            const [snapStr, snapNum] = await Promise.all([
+                db.collection('transactions').where('bookingId', '==', String(id_giao_dich)).get(),
+                db.collection('transactions').where('bookingId', '==', id_giao_dich).get(),
+            ]);
+            // Gộp kết quả, loại trùng theo doc ID
+            const docsMap = new Map();
+            [...snapStr.docs, ...snapNum.docs].forEach(d => docsMap.set(d.id, d));
+            snapshot = { empty: docsMap.size === 0, docs: [...docsMap.values()] };
+        } catch (firestoreErr) {
+            console.error('[xacNhanThanhToan] ❌ Lỗi Firestore khi tìm transaction:', firestoreErr.code, firestoreErr.message);
+            return res.status(500).json({ loi: `Lỗi Firestore: ${firestoreErr.message}` });
+        }
+
         if (snapshot.empty) return res.status(200).json({ thanh_cong: false, loi: "Không tìm thấy biên lai AI." });
 
         const docs = snapshot.docs.sort((a,b) => (b.data().createdAt?.toMillis() || 0) - (a.data().createdAt?.toMillis() || 0));
         const transactionDoc = docs[0];
         const ocr = transactionDoc.data().ocrData || {};
 
+        // B3: Đối soát biên lai
+        console.log(`[xacNhanThanhToan] B3 - Đối soát OCR`);
         const khop_nguoi_nhan = removeAccents(ocr.detectedRecipient || "").toUpperCase().includes("DINH VAN MANH");
         const khop_so_tien = Math.abs(parseInt(ocr.detectedAmount) - parseInt(deal.OPPORTUNITY)) < 100;
         const khop_noi_dung = String(ocr.detectedContent || "").toUpperCase().includes(`DH${id_giao_dich}`);
@@ -197,45 +217,61 @@ const xacNhanThanhToan = async (req, res) => {
         if (gio_ck && Math.abs(Date.now() - gio_ck.getTime()) / 60000 <= 10.5) khop_thoi_gian = true;
 
         if (!khop_nguoi_nhan || !khop_so_tien || !khop_noi_dung || !khop_thoi_gian) {
+            console.log(`[xacNhanThanhToan] ❌ Đối soát thất bại:`, { khop_nguoi_nhan, khop_so_tien, khop_noi_dung, khop_thoi_gian });
             return res.status(200).json({ thanh_cong: false, loi: "Biên lai không khớp đối soát." });
         }
 
+        // B4: Cập nhật Bitrix
+        console.log(`[xacNhanThanhToan] B4 - Cập nhật Bitrix24`);
         await axios.post(`${url_goc}crm.item.add?entityTypeId=31`, {
             fields: { title: `Cọc DH${id_giao_dich}`, opportunity: deal.OPPORTUNITY, currencyId: "VND", parentId2: id_giao_dich, opened: "Y" }
         });
-
-        // CHUYỂN SANG CỘT "ĐÃ XUẤT HOÁ ĐƠN" (Stage ID: PREPAYMENT_INVOICE)
         await axios.post(`${url_goc}crm.deal.update`, { id: id_giao_dich, fields: { STAGE_ID: "PREPAYMENT_INVOICE" } });
 
-        const bookingPaymentDoc = await db.collection('booking_payments').doc(String(id_giao_dich)).get();
-        const bookingPayment = bookingPaymentDoc.exists ? bookingPaymentDoc.data() : null;
-        const afterSalesPayload = buildAfterSalesPayload({
-            deal: { ...deal, STAGE_ID: "PREPAYMENT_INVOICE" },
-            bookingPayment,
-            transaction: transactionDoc.data(),
-            invoiceId: null,
-        });
-        const afterSalesResult = await processInvoiceSuccess(afterSalesPayload);
+        // B5: After-sales (loyalty + email) — không để lỗi ở đây làm fail toàn bộ flow
+        console.log(`[xacNhanThanhToan] B5 - After-sales`);
+        let afterSalesResult = null;
+        try {
+            const bookingPaymentDoc = await db.collection('booking_payments').doc(String(id_giao_dich)).get();
+            const bookingPayment = bookingPaymentDoc.exists ? bookingPaymentDoc.data() : null;
+            const afterSalesPayload = buildAfterSalesPayload({
+                deal: { ...deal, STAGE_ID: "PREPAYMENT_INVOICE" },
+                bookingPayment,
+                transaction: transactionDoc.data(),
+                invoiceId: null,
+            });
+            afterSalesResult = await processInvoiceSuccess(afterSalesPayload);
+        } catch (afterSalesErr) {
+            console.error('[xacNhanThanhToan] ⚠️ After-sales lỗi (không block flow):', afterSalesErr.message);
+            afterSalesResult = { error: afterSalesErr.message };
+        }
 
-        await transactionDoc.ref.update({
-            ocrStatus: 'verified',
-            bitrixStatus: 'confirmed',
-            verifiedAt: new Date(),
-            afterSalesPayload,
-            afterSalesResult,
-        });
+        // B6: Cập nhật Firestore
+        console.log(`[xacNhanThanhToan] B6 - Cập nhật Firestore`);
+        try {
+            await transactionDoc.ref.update({
+                ocrStatus: 'verified',
+                bitrixStatus: 'confirmed',
+                verifiedAt: new Date(),
+                afterSalesResult,
+            });
+            await db.collection('booking_payments').doc(String(id_giao_dich)).set({
+                status: 'invoice_success',
+                afterSalesResult,
+                updatedAt: new Date(),
+            }, { merge: true });
+        } catch (updateErr) {
+            console.error('[xacNhanThanhToan] ⚠️ Cập nhật Firestore lỗi:', updateErr.message);
+        }
 
-        await db.collection('booking_payments').doc(String(id_giao_dich)).set({
-            status: 'invoice_success',
-            afterSalesResult,
-            updatedAt: new Date(),
-        }, { merge: true });
-
+        console.log(`[xacNhanThanhToan] ✅ Xác nhận thành công cho deal ${id_giao_dich}`);
         return res.status(200).json({ thanh_cong: true, afterSales: afterSalesResult });
     } catch (err) {
-        return res.status(500).json({ loi: "Lỗi Bitrix24: " + err.message });
+        console.error('[xacNhanThanhToan] ❌ Lỗi không xác định:', err.code, err.message);
+        return res.status(500).json({ loi: "Lỗi xử lý: " + err.message });
     }
 };
+
 
 // 4. API GET: Lấy lịch sử đặt hẹn
 const layLichSuDatHen = async (req, res) => {

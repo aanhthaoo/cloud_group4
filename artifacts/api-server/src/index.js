@@ -12,8 +12,10 @@ app.use(express.json());
 // Import các routes API
 const indexRoutes = require('./routes/index.routes.js');
 const paymentRoutes = require('./routes/payment.routes.js');
+const bookingRoutes = require('./routes/booking.routes.js');
 app.use('/', indexRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 
 // Route gốc

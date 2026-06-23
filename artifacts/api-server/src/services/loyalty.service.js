@@ -51,99 +51,111 @@ async function ensureBitrixContact(userRef, user) {
 }
 
 async function applyLoyaltyAfterPayment(uid, paidAmount, options = {}) {
+  console.log(`\n  [LOYALTY] applyLoyaltyAfterPayment: uid=${uid}, paidAmount=${paidAmount}`);
+
   const userRef = db.collection("users").doc(uid);
   const eventId = options.eventId ? String(options.eventId) : null;
   const eventRef = eventId ? db.collection("loyalty_events").doc(eventId) : null;
 
   let result = null;
 
-  await db.runTransaction(async (transaction) => {
+  try {
     if (eventRef) {
-      const eventDoc = await transaction.get(eventRef);
+      const eventDoc = await eventRef.get();
       if (eventDoc.exists) {
+        console.log(`  [LOYALTY] Event ${eventId} đã xử lý trước đó, bỏ qua.`);
         result = {
           ...eventDoc.data().result,
           alreadyProcessed: true,
         };
-        return;
       }
     }
 
-    const userDoc = await transaction.get(userRef);
+    if (!result) {
+      const userDoc = await userRef.get();
 
-    if (!userDoc.exists) {
-      throw new Error("Không tìm thấy người dùng để cộng điểm");
-    }
+      if (!userDoc.exists) {
+        throw new Error("Không tìm thấy người dùng để cộng điểm");
+      }
 
-    const user = userDoc.data();
+      const user = userDoc.data();
+      console.log(`  [LOYALTY] User hiện tại: loyalty=${JSON.stringify(user.loyalty)}`);
 
-    const oldLoyalty = user.loyalty || {
-      tier: "Member",
-      points: 0,
-      lifetimePoints: 0,
-      totalSpent: 0,
-      discountPercent: 0,
-    };
+      const oldLoyalty = user.loyalty || {
+        tier: "Member",
+        points: 0,
+        lifetimePoints: 0,
+        totalSpent: 0,
+        discountPercent: 0,
+      };
 
-    const pointsAdded = calculatePoints(paidAmount);
-    const newTotalSpent =
-      Number(oldLoyalty.totalSpent || 0) + Number(paidAmount || 0);
-    const oldLifetimePoints = Number(
-      oldLoyalty.lifetimePoints ?? oldLoyalty.points ?? 0
-    );
-    const newLifetimePoints = oldLifetimePoints + pointsAdded;
+      const pointsAdded = calculatePoints(paidAmount);
+      const newTotalSpent =
+        Number(oldLoyalty.totalSpent || 0) + Number(paidAmount || 0);
+      const oldLifetimePoints = Number(
+        oldLoyalty.lifetimePoints ?? oldLoyalty.points ?? 0
+      );
+      const newLifetimePoints = oldLifetimePoints + pointsAdded;
 
-    const oldTier = oldLoyalty.tier || "Member";
-    const newTier = calculateTier(newLifetimePoints);
+      const oldTier = oldLoyalty.tier || "Member";
+      const newTier = calculateTier(newLifetimePoints);
 
-    const newLoyalty = {
-      points: newLifetimePoints,
-      lifetimePoints: newLifetimePoints,
-      totalSpent: newTotalSpent,
-      tier: newTier,
-      discountPercent: getTierBenefit(newTier).discountPercent,
-      updatedAt: new Date(),
-    };
+      console.log(`  [LOYALTY] Tính điểm: paidAmount=${paidAmount} -> +${pointsAdded} điểm | ${oldLifetimePoints} -> ${newLifetimePoints} | tier: ${oldTier} -> ${newTier}`);
 
-    transaction.update(userRef, {
-      loyalty: newLoyalty,
-      updatedAt: new Date(),
-    });
+      const newLoyalty = {
+        points: newLifetimePoints,
+        lifetimePoints: newLifetimePoints,
+        totalSpent: newTotalSpent,
+        tier: newTier,
+        discountPercent: getTierBenefit(newTier).discountPercent,
+        updatedAt: new Date(),
+      };
 
-    result = {
-      user: {
-        uid,
-        ...user,
-      },
-      oldTier,
-      newTier,
-      pointsAdded,
-      loyalty: newLoyalty,
-      isTierUpgraded: oldTier !== newTier,
-      alreadyProcessed: false,
-      source: options.source || null,
-      sourceId: options.sourceId || null,
-    };
+      await userRef.update({
+        loyalty: newLoyalty,
+        updatedAt: new Date(),
+      });
+      console.log(`  [LOYALTY] Đã ghi loyalty mới vào Firestore (không dùng transaction)`);
 
-    if (eventRef) {
-      transaction.set(eventRef, {
-        eventId,
-        uid,
-        paidAmount: Number(paidAmount || 0),
+      result = {
+        user: {
+          uid,
+          ...user,
+        },
+        oldTier,
+        newTier,
+        pointsAdded,
+        loyalty: newLoyalty,
+        isTierUpgraded: oldTier !== newTier,
+        alreadyProcessed: false,
         source: options.source || null,
         sourceId: options.sourceId || null,
-        payload: options.payload || null,
-        result,
-        createdAt: new Date(),
-      });
+      };
+
+      if (eventRef) {
+        await eventRef.set({
+          eventId,
+          uid,
+          paidAmount: Number(paidAmount || 0),
+          source: options.source || null,
+          sourceId: options.sourceId || null,
+          payload: options.payload || null,
+          result,
+          createdAt: new Date(),
+        });
+      }
     }
-  });
+  } catch (txError) {
+    console.error(`  [LOYALTY] Lỗi cập nhật điểm nội bộ:`, txError);
+    throw txError;
+  }
 
   if (result?.alreadyProcessed) {
     return result;
   }
 
   const userSnap = await userRef.get();
+  console.log(`  [LOYALTY] Firestore loyalty sau transaction: ${JSON.stringify(userSnap.data()?.loyalty)}`);
 
   const latestUser = {
     uid,
@@ -154,14 +166,19 @@ async function applyLoyaltyAfterPayment(uid, paidAmount, options = {}) {
   let bitrixSyncError = null;
 
   try {
+    console.log(`  [LOYALTY] Bắt đầu đồng bộ Bitrix24...`);
     bitrixContactId = await ensureBitrixContact(userRef, latestUser);
+    console.log(`  [LOYALTY] bitrixContactId=${bitrixContactId}`);
 
     if (bitrixContactId) {
       await updateContactLoyalty(bitrixContactId, result.loyalty);
+      console.log(`  [LOYALTY] Đồng bộ Bitrix24 thành công`);
+    } else {
+      console.warn(`  [LOYALTY] Không tìm được bitrixContactId, bỏ qua sync Bitrix`);
     }
   } catch (error) {
     bitrixSyncError = error.message;
-    console.error("[LOYALTY] Bitrix sync failed:", error.message);
+    console.error("  [LOYALTY] Bitrix sync failed:", error.message);
   }
 
   return {
