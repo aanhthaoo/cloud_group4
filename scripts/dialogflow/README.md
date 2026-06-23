@@ -9,7 +9,8 @@ This folder contains the Dialogflow ES setup for Minh's chatbot module.
 - Additional language: English (`en`)
 - Time zone: `Asia/Ho_Chi_Minh`
 - Entity types: `service_type`, `budget_range`, `handoff_signal`
-- Intents: `FAQ - GioMoCua`, `FAQ - BangGia`, `TracNghiem - 1 - BatDau`, `TracNghiem - 2 - ChamSocDa`, `TracNghiem - 3 - DaDauMun`, `TracNghiem - 4 - ThuGianDauVai`, `DatLich - KiemTraLichTrong`, `YeuCau - GapNhanVien`
+- Supported service flows: `Massage thư giãn`, `Chăm sóc da mặt`, `Nails & Pedicure`, `Waxing`, `Gói Cô Dâu`
+- Intents: `FAQ - GioMoCua`, `FAQ - BangGia`, `TracNghiem - 1 - BatDau`, `TracNghiem - 2 - ChamSocDa`, `TracNghiem - 3A - DaKho`, `TracNghiem - 3B - DaXinMau`, `TracNghiem - 3 - DaDauMun`, `TracNghiem - 4 - ThuGianDauVai`, `TracNghiem - 5 - NailsPedicure`, `TracNghiem - 6 - Waxing`, `TracNghiem - 7 - GoiCoDau`, `DatLich - KiemTraLichTrong`, `YeuCau - GapNhanVien`
 
 ## Run
 

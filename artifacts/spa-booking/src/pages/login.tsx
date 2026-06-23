@@ -89,7 +89,10 @@ export default function Login() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 pb-8">
-            {/* Cloudflare Turnstile widget */}
+            <Button
+              type="submit"
+              className="w-full h-12 text-lg shadow-sm"
+              {/* Cloudflare Turnstile widget */}
             <div className="w-full flex justify-center">
               <Turnstile
                 ref={turnstileRef}
@@ -123,3 +126,4 @@ export default function Login() {
     </div>
   );
 }
+//trigger
