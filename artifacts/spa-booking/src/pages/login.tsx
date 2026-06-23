@@ -80,9 +80,9 @@ export default function Login() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 pb-8">
-            <Button 
-              type="submit" 
-              className="w-full h-12 text-lg shadow-sm" 
+            <Button
+              type="submit"
+              className="w-full h-12 text-lg shadow-sm"
               data-testid="button-login-submit"
               disabled={isLoading}
             >
@@ -100,3 +100,4 @@ export default function Login() {
     </div>
   );
 }
+//trigger
