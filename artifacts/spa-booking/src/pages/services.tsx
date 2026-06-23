@@ -1,24 +1,186 @@
-import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import axios from "axios";
+import * as ThuVienIcon from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function Services() {
+  const [services, setServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await axios.get("/api/thong-tin-dat-lich");
+        setServices(response.data.danh_sach_dich_vu);
+      } catch (error) {
+        console.error("Lỗi tải danh sách dịch vụ:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  // Hàm bổ trợ để map icon và màu sắc dựa trên tên dịch vụ
+  const getServiceStyles = (name: string) => {
+    if (name.includes("Massage")) return {
+      icon: "Flower2",
+      bg: "bg-pink-50",
+      border: "border-pink-100",
+      text: "text-pink-600",
+      tag: "Bán chạy nhất",
+      tagColor: "bg-pink-100 text-pink-600",
+      features: ["Giảm căng thẳng cơ bắp", "Cải thiện tuần hoàn", "Ngủ sâu hơn", "Tăng cường miễn dịch"]
+    };
+    if (name.includes("Chăm sóc da")) return {
+      icon: "Sparkles",
+      bg: "bg-purple-50",
+      border: "border-purple-100",
+      text: "text-purple-600",
+      tag: "Được yêu thích",
+      tagColor: "bg-purple-100 text-purple-600",
+      features: ["Làm sạch sâu lỗ chân lông", "Cấp ẩm chuyên sâu", "Giảm nếp nhăn", "Da sáng mịn tức thì"]
+    };
+    if (name.includes("Nails")) return {
+      icon: "Scissors",
+      bg: "bg-red-50",
+      border: "border-red-100",
+      text: "text-red-600",
+      tag: null,
+      tagColor: "",
+      features: ["Gel bền màu 3 tuần", "Sản phẩm an toàn", "Tạo hình chuyên nghiệp", "Ngâm dưỡng thư giãn"]
+    };
+    if (name.includes("Waxing")) return {
+      icon: "Zap",
+      bg: "bg-emerald-50",
+      border: "border-emerald-100",
+      text: "text-emerald-600",
+      tag: "Nhanh chóng",
+      tagColor: "bg-emerald-100 text-emerald-600",
+      features: ["Sạch lông tận gốc", "Giảm đau tối đa", "Dưỡng da sau wax", "Nguyên liệu tự nhiên"]
+    };
+    if (name.includes("cô dâu")) return {
+      icon: "Heart",
+      bg: "bg-amber-50",
+      border: "border-amber-200",
+      text: "text-amber-600",
+      tag: "Gói cao cấp",
+      tagColor: "bg-amber-100 text-amber-600",
+      features: ["Chăm sóc toàn diện", "Tỏa sáng ngày cưới", "Combo tiết kiệm", "Quà tặng đi kèm"]
+    };
+    return {
+      icon: "CheckCircle2",
+      bg: "bg-yellow-50",
+      border: "border-yellow-100",
+      text: "text-yellow-600",
+      tag: null,
+      tagColor: "",
+      features: ["Trải nghiệm đẳng cấp", "Dịch vụ tận tâm"]
+    };
+  };
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="animate-pulse text-primary font-serif text-xl">Đang tải dịch vụ...</div>
+    </div>
+  );
+
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-serif font-bold text-foreground mb-3">
-            Dịch vụ của <span className="text-primary">LotusGlow</span>
+    <div className="min-h-screen bg-white py-16 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-16 space-y-4">
+          <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-800">
+            Dịch vụ của <span className="text-pink-400">LotusGlow</span>
           </h1>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto" data-testid="khung-danh-sach-dich-vu">
-            Đang chờ tích hợp API để hiển thị danh sách dịch vụ và thông tin chi tiết.
+          <p className="text-gray-500 text-lg max-w-2xl mx-auto leading-relaxed">
+            Mỗi dịch vụ được thiết kế tỉ mỉ để mang lại trải nghiệm thư giãn và làm đẹp đỉnh cao.
           </p>
+          <div className="w-16 h-1 bg-pink-200 mx-auto rounded-full mt-4"></div>
         </div>
 
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">Bộ khung trang dịch vụ đã sẵn sàng để nối API thật.</p>
-          </CardContent>
-        </Card>
+        {/* Danh sách dịch vụ */}
+        <div className="space-y-8">
+          {services.map((service) => {
+            const styles = getServiceStyles(service.ten);
+            const IconComponent = (ThuVienIcon as any)[styles.icon] || ThuVienIcon.CheckCircle2;
+
+            return (
+              <div
+                key={service.id}
+                className={`group relative border-2 ${styles.border} ${styles.bg} rounded-3xl p-8 transition-all hover:shadow-xl hover:-translate-y-1`}
+              >
+                <div className="flex flex-col md:flex-row gap-8">
+                  {/* Icon bên trái */}
+                  <div className={`w-16 h-16 shrink-0 rounded-2xl bg-white flex items-center justify-center shadow-sm ${styles.text}`}>
+                    <IconComponent className="w-8 h-8" />
+                  </div>
+
+                  {/* Nội dung ở giữa */}
+                  <div className="flex-1 space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="text-2xl font-bold text-gray-800">{service.ten}</h2>
+                      {styles.tag && (
+                        <Badge variant="secondary" className={`${styles.tagColor} border-none font-bold text-[10px] px-2 py-0.5 uppercase tracking-wider`}>
+                          {styles.tag}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <p className="text-gray-400 font-medium text-sm italic">
+                      {service.ten.includes("Massage") ? "Liệu pháp phục hồi toàn thân" :
+                       service.ten.includes("da mặt") ? "Da sáng mịn từ sâu bên trong" :
+                       service.ten.includes("Nails") ? "Đôi tay đôi chân hoàn hảo" :
+                       service.ten.includes("Waxing") ? "Làn da mịn màng, sạch bóng" : "Chăm sóc toàn diện"}
+                    </p>
+
+                    <p className="text-gray-600 text-sm leading-relaxed max-w-2xl">
+                      {service.mo_ta}
+                    </p>
+
+                    {/* Features Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-8 pt-2">
+                      {styles.features.map((feature, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm text-gray-500">
+                          <div className={`w-1 h-1 rounded-full ${styles.text} bg-current`}></div>
+                          <span>{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Giá & Nút bên phải */}
+                  <div className="flex flex-col items-end justify-between min-w-[140px] gap-4 border-l border-gray-100 pl-8 md:border-l">
+                    <div className="text-right">
+                      <div className="text-3xl font-black text-pink-400">
+                        {service.gia.toLocaleString()}đ
+                      </div>
+                      <div className="flex flex-col items-end mt-2 text-[11px] font-bold text-gray-400 space-y-1">
+                        <div className="flex items-center gap-1 uppercase">
+                          <ThuVienIcon.Clock className="w-3 h-3" /> {service.thoi_gian} phút
+                        </div>
+                        <div className="flex items-center gap-1 text-yellow-400">
+                          <ThuVienIcon.Star className="fill-current w-3 h-3" />
+                          <span className="text-gray-400">4.9 (128)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => setLocation("/booking")}
+                      className="bg-pink-300 hover:bg-pink-400 text-white font-bold rounded-xl px-8 py-6 shadow-sm transition-all active:scale-95"
+                    >
+                      Đặt lịch
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
